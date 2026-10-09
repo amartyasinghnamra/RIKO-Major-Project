@@ -1,0 +1,19 @@
+
+{
+    "identity": {
+        "preferred_name": "User",
+        "role": "Student"
+    },
+    "interests": [
+        "Artificial Intelligence",
+        "Programming"
+    ],
+    "current_goals": [
+        "Learn programming fundamentals"
+    ],
+    "learning_preferences": {
+        "explanation_style": "step-by-step, beginner-friendly",
+        "pace": "adapt to the user's needs",
+        "code_explanations": true
+    }
+}

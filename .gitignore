@@ -1,0 +1,17 @@
+
+# Personal configuration - never publish
+/config/local/user_profile.json
+/config/local/behavior.local.json
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+
+# Local secrets
+.env
+.env.*
+!.env.example
