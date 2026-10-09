@@ -1,33 +1,74 @@
+
+import json
+import tempfile
 from pathlib import Path
 
 from prompt_manager import PromptManager
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
-
 def main():
-    manager = PromptManager(PROJECT_ROOT)
-    prompt = manager.build_prompt()
+    with tempfile.TemporaryDirectory() as temp_dir:
+        root = Path(temp_dir)
 
-    # No unfilled placeholders should survive formatting.
-    assert "{user_profile}" not in prompt
-    assert "{behavior_instructions}" not in prompt
-    assert "{persona_name}" not in prompt
-    assert "{persona_description}" not in prompt
+        (root / "config" / "defaults").mkdir(parents=True)
+        (root / "config" / "examples").mkdir(parents=True)
+        (root / "config" / "personas").mkdir(parents=True)
+        (root / "prompts").mkdir(parents=True)
 
-    # The persona drives the identity line.
-    assert "You are Riko" in prompt
+        (root / "config" / "defaults" / "behavior.default.json").write_text(
+            json.dumps({"personality": {"warmth": 5}}),
+            encoding="utf-8",
+        )
 
-    # Neutral defaults are present.
-    assert "warmth" in prompt
+        (root / "config" / "personas" / "assistant.json").write_text(
+            json.dumps({
+                "name": "Riko",
+                "description": "Neutral assistant.",
+                "greeting": "Hello!",
+                "behavior": {},
+            }),
+            encoding="utf-8",
+        )
 
-    # The published example profile is used when no local profile exists.
-    assert "User" in prompt
+        (root / "config" / "examples" / "user_profile.example.json").write_text(
+            json.dumps({
+                "identity": {"preferred_name": "User"},
+                "interests": ["Programming"],
+            }),
+            encoding="utf-8",
+        )
 
-    print("PromptManager test passed!")
-    print("\n--- Prompt preview ---\n")
-    print(prompt[:1000])
+        (root / "prompts" / "system_prompt.txt").write_text(
+            "You are {persona_name}. "
+            "Persona: {persona_description}. "
+            "Profile: {user_profile}. "
+            "Behaviour: {behavior_instructions}",
+            encoding="utf-8",
+        )
+
+        manager = PromptManager(root)
+        prompt = manager.build_prompt()
+
+        assert "You are Riko" in prompt
+        assert "Neutral assistant." in prompt
+        assert "User" in prompt
+        assert "warmth" in prompt
+
+        for placeholder in (
+            "{user_profile}",
+            "{behavior_instructions}",
+            "{persona_name}",
+            "{persona_description}",
+        ):
+            assert placeholder not in prompt, (
+                f"Unfilled placeholder: {placeholder}"
+            )
+
+        print("PASS: Prompt uses the example profile.")
+        print("PASS: Persona and default behaviour are included.")
+        print("PASS: No unfilled placeholders remain.")
+
+    print("All PromptManager tests passed!")
 
 
 if __name__ == "__main__":
