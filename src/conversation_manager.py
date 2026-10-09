@@ -1,14 +1,15 @@
 
 class ConversationManager:
-    def __init__(self, prompt_manager, ollama_client):
+    def __init__(self, prompt_manager, ollama_client, mode="text"):
         self.ollama_client = ollama_client
+        self.mode = mode
 
-        system_prompt = prompt_manager.build_prompt()
+        system_prompt = prompt_manager.build_prompt(mode=mode)
 
         self.messages = [
             {
                 "role": "system",
-                "content": system_prompt
+                "content": system_prompt,
             }
         ]
 
@@ -16,7 +17,7 @@ class ConversationManager:
         self.messages.append(
             {
                 "role": "user",
-                "content": user_message
+                "content": user_message,
             }
         )
 
@@ -33,6 +34,6 @@ class ConversationManager:
         self.messages.append(
             {
                 "role": "assistant",
-                "content": complete_response
+                "content": complete_response,
             }
         )

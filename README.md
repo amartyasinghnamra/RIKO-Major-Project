@@ -1,66 +1,66 @@
 # RIKO — A Personalized Local AI Companion
 
-RIKO is a modular, local-first AI companion project focused on personalized conversations, local language-model inference, and a future voice-interaction pipeline.
+RIKO is a modular, local-first AI companion built around personalized conversations, local language-model inference, and a voice interaction pipeline.
 
-The project emphasizes modularity, configurable conversational behaviour, privacy, and the ability to personalize the assistant through user-specific profiles.
-
-## Project Goals
-
-- Run language-model inference locally using Ollama.
-- Support streaming conversational responses.
-- Separate conversation management, model communication, and prompt management.
-- Allow configurable assistant behaviour and personalized user profiles.
-- Develop speech recognition and voice synthesis as future components.
+The project separates conversational logic, prompt management, and interface-specific behaviour so Text Chat and Voice Chat can evolve independently.
 
 ## Current Features
 
-- **Local LLM integration:** Communicates with Ollama using the `qwen3:4b-instruct` model.
-- **Streaming chat:** Processes model responses incrementally.
-- **Conversation management:** Organizes conversation flow and history.
-- **Prompt management:** Loads system prompts, default behaviour, and user-profile configuration.
-- **Pluggable personas:** The assistant's identity and tone come from a
-  persona file, not from source code. See *Personas and Privacy* below.
-- **Configuration fallback:** Uses example profile configuration when a local profile is unavailable.
-- **Local profile creation:** Provides an interactive utility for creating a personal user profile.
-- **Test scripts:** Includes tests for conversation management, prompt management, fallback behaviour, and the Ollama client.
+- **Local LLM:** Uses Ollama with `qwen3:4b-instruct`.
+- **Streaming responses:** Displays generated responses incrementally.
+- **Text Chat:** Runs as a separate mode without initializing the voice engine.
+- **Voice Chat:** Integrates Kokoro ONNX text-to-speech with audio playback.
+- **Prompt management:** Builds prompts using persona, user-profile, behaviour, and mode-specific style configuration.
+- **Conversation management:** Maintains conversation history during a session.
+- **Configuration fallback:** Supports example profile configuration when local profile data is unavailable.
+- **Privacy-conscious configuration:** Keeps private local settings out of version control.
 
 ## Architecture
 
 ```text
 RIKO_PROJECT/
+├── audio/
+│   ├── playback.py
+│   └── kokoro/
+│       └── tts.py
 ├── config/
 │   ├── defaults/
-│   │   └── behavior.default.json
-│   ├── personas/              # Public, neutral example personas
-│   │   ├── assistant.json
-│   │   └── tutor.json
 │   ├── examples/
-│   │   └── user_profile.example.json
-│   └── local/                 # Private local configuration (gitignored)
+│   ├── local/
+│   └── personas/
+├── models/
+│   └── kokoro/
+│       ├── kokoro-v1.0.int8.onnx
+│       └── voices-v1.0.bin
 ├── prompts/
-│   └── system_prompt.txt
+│   ├── system_prompt.txt
+│   ├── text_style.txt
+│   └── voice_style.txt
 ├── src/
-│   ├── main.py
+│   ├── modes/
+│   │   ├── text_chat.py
+│   │   └── voice_chat.py
 │   ├── conversation_manager.py
+│   ├── create_user_profile.py
+│   ├── main.py
 │   ├── ollama_client.py
 │   ├── prompt_manager.py
-│   ├── create_user_profile.py
-│   ├── test_conversation_manager.py
-│   ├── test_ollama_client.py
-│   ├── test_prompt_fallback.py
-│   └── test_prompt_manager.py
+│   └── test_*.py
+├── requirements.txt
 ├── .gitignore
-├── LICENSE
 └── README.md
 ```
 
 ## Requirements
 
-- Python 3
-- [Ollama](https://ollama.com/)
-- The `qwen3:4b-instruct` model available locally
+- Python 3.14.8 — current development environment
+- Ollama installed and running locally
+- `qwen3:4b-instruct` available in Ollama
+- Python packages listed in `requirements.txt`
+- Kokoro ONNX model and voice files for Voice Chat
+- A working audio output device for Voice Chat
 
-## Getting Started
+## Installation
 
 ### 1. Clone the repository
 
@@ -69,103 +69,83 @@ git clone https://github.com/amartyasinghnamra/RIKO-Major-Project.git
 cd RIKO-Major-Project
 ```
 
-### 2. Download the model
+### 2. Create a Python environment
 
-Make sure Ollama is installed and running, then run:
+On Windows:
+
+```cmd
+python -m venv .venv-tts
+.venv-tts\Scripts\activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### 3. Configure Ollama
+
+Install Ollama, start its local service, and pull the model:
 
 ```bash
 ollama pull qwen3:4b-instruct
 ```
 
-You can verify the model with:
+### 4. Configure Kokoro
 
-```bash
-ollama run qwen3:4b-instruct
+Place the required Kokoro ONNX model and voice file in:
+
+```text
+models/kokoro/
 ```
 
-Exit the interactive session after confirming that the model works.
+The expected filenames are:
 
-### 3. Run RIKO
-
-From the project root, execute:
-
-```bash
-python src/main.py
+```text
+kokoro-v1.0.int8.onnx
+voices-v1.0.bin
 ```
 
-If your system uses `python3`, run:
+Model weights are not committed to this repository. Obtain them separately from a source you trust and follow the applicable model licence.
 
-```bash
-python3 src/main.py
+### 5. Run RIKO
+
+From the project root:
+
+```cmd
+python src\main.py
 ```
 
-## Personas and Privacy
+Select one of the available modes:
 
-RIKO separates the assistant's **persona** from the framework that runs it.
-
-- `config/defaults/behavior.default.json` holds neutral, professional
-  defaults and is published as-is.
-- `config/personas/` holds public example personas (`assistant`, `tutor`).
-  These are deliberately neutral so the repository is safe to share.
-- `config/local/personas/` holds private personas. This folder is
-  gitignored and is never published.
-- `config/local/config.json` selects the active persona with a single
-  field:
-
-  ```json
-  { "persona": "assistant" }
-  ```
-
-Loading order is **defaults -> persona -> local override**, so a local file
-always wins. If a persona file is missing or malformed, RIKO falls back to
-the bundled `assistant` persona instead of crashing.
-
-The important consequence: the *framework* is the project. Any particular
-persona is just configuration, and personal configuration never leaves the
-machine.
-
-## Configuration and Privacy
-
-RIKO separates default settings, example profiles, and private local configuration.
-
-- `config/defaults/` contains default behaviour settings.
-- `config/examples/` contains example configuration files.
-- `config/local/` is reserved for private, machine-specific configuration.
-- `prompts/` contains the system prompt.
-
-Personal profiles, local behaviour overrides, credentials, and other private settings should not be committed to version control.
+- `1` — Text Chat
+- `2` — Voice Chat
+- `0` — Exit
 
 ## Testing
 
-Run the available tests from the project root:
+Run the core test scripts from the project root:
 
-```bash
-python src/test_persona_manager.py
-python src/test_prompt_manager.py
-python src/test_conversation_manager.py
-python src/test_prompt_fallback.py
-python src/test_ollama_client.py
+```cmd
+python -m compileall -q src audio
+python src\test_persona_manager.py
+python src\test_prompt_manager.py
+python src\test_conversation_manager.py
+python src\test_prompt_fallback.py
+python src\test_ollama_client.py
 ```
 
-The Ollama-client test may require a running local Ollama service and the configured model.
+The Ollama client test may require the local Ollama service and model.
 
-## Roadmap
+Additional audio test scripts are available for manual testing of synthesis and playback. Some audio tests require the local Kokoro model files and an audio output device.
 
-Planned development includes:
+## Privacy
 
-- Speech-to-text integration using Faster-Whisper.
-- Voice synthesis integration using GPT-SoVITS.
-- A modular pipeline connecting language generation, text chunking, and speech synthesis.
-- Improvements to personalization and conversational behaviour.
-- A persona-selection interface.
-- Testing and performance evaluation of the integrated voice pipeline.
+RIKO is designed to keep local profile configuration and private behaviour overrides on the user's machine. Do not commit credentials, `.env` files, private profiles, or personal configuration.
 
-**Note:** Speech recognition and voice synthesis are planned components. They should not be considered integrated features until implementation and testing are complete.
+Local-first inference does not imply that every optional integration is offline: verify the behaviour of any external service before using it with private data.
 
 ## Project Status
 
-RIKO is under active development. The current focus is on building a clean, modular conversational core with a configurable persona layer before expanding into voice interaction.
+RIKO is under active development. Text Chat, the conversational core, and the Kokoro-based Voice Chat implementation are present in the current development version. Further work includes improving conversational behaviour, testing, modularity, and the overall user experience.
 
 ## License
 
-RIKO is licensed under the [MIT License](LICENSE).
+RIKO is licensed under the MIT License. See [LICENSE](LICENSE) for details.

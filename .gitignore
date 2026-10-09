@@ -1,23 +1,30 @@
-
-# Personal configuration - never publish
-/config/local/user_profile.json
-/config/local/behavior.local.json
-
-# Python cache and compiled files
-__pycache__/
-*.py[cod]
-
-# Virtual environments
-.venv/
-venv/
+# Private local configuration - never publish
+/config/local/
+!/config/local/.gitkeep
 
 # Local secrets
 .env
 .env.*
 !.env.example
 
-# Private local configuration - never publish
-/config/local/
+# Python virtual environments
+.venv/
+.venv-tts/
+venv/
 
-# Allow an example configuration to be committed, if needed
-!/config/local/.gitkeep
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+
+# Local Kokoro model weights
+/models/kokoro/*.onnx
+/models/kokoro/*.bin
+
+# Generated audio and temporary artifacts
+/kokoro_test.wav
+/test_audio_tail.pyclear
+/threshold)
+/audio/kokoro/tts.py.bak
+
+# Local cleanup backups
+/cleanup_quarantine/

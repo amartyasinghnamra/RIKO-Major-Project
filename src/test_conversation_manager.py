@@ -3,9 +3,9 @@ from conversation_manager import ConversationManager
 
 
 class FakePromptManager:
-    def build_prompt(self):
+    def build_prompt(self, mode="text"):
+        assert mode in ("text", "voice")
         return "You are Riko, a helpful AI companion."
-
 
 class FakeOllamaClient:
     def stream_response(self, messages):

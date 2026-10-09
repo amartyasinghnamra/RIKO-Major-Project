@@ -1,10 +1,13 @@
-# RIKO has no third-party Python dependencies at this stage.
-# It talks to a local Ollama server using the standard library only.
-#
-# Requirements:
-#   - Python 3.10+
-#   - Ollama running locally, with the qwen3:4b-instruct model pulled
-#
-# Future voice pipeline (not yet implemented) will add dependencies such as
-# faster-whisper and a speech-synthesis package. They are intentionally
-# omitted until that stage is actually built and tested.
+# RIKO — direct Python dependencies
+# Tested in the current Windows development environment.
+# Python 3.14.8
+
+# Local Kokoro text-to-speech
+kokoro-onnx==0.4.7
+
+# Audio playback and audio-file handling
+sounddevice==0.5.6
+soundfile==0.14.0
+
+# Numerical audio processing
+numpy==2.5.3
