@@ -1,4 +1,4 @@
-\# RIKO â€” A Personalized Local AI Companion
+# RIKO â€” A Personalized Local AI Companion
 
 
 
