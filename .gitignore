@@ -15,3 +15,9 @@ venv/
 .env
 .env.*
 !.env.example
+
+# Private local configuration - never publish
+/config/local/
+
+# Allow an example configuration to be committed, if needed
+!/config/local/.gitkeep
