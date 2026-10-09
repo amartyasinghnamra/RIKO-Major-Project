@@ -18,6 +18,8 @@ The project emphasizes modularity, configurable conversational behaviour, privac
 - **Streaming chat:** Processes model responses incrementally.
 - **Conversation management:** Organizes conversation flow and history.
 - **Prompt management:** Loads system prompts, default behaviour, and user-profile configuration.
+- **Pluggable personas:** The assistant's identity and tone come from a
+  persona file, not from source code. See *Personas and Privacy* below.
 - **Configuration fallback:** Uses example profile configuration when a local profile is unavailable.
 - **Local profile creation:** Provides an interactive utility for creating a personal user profile.
 - **Test scripts:** Includes tests for conversation management, prompt management, fallback behaviour, and the Ollama client.
@@ -29,9 +31,12 @@ RIKO_PROJECT/
 ├── config/
 │   ├── defaults/
 │   │   └── behavior.default.json
+│   ├── personas/              # Public, neutral example personas
+│   │   ├── assistant.json
+│   │   └── tutor.json
 │   ├── examples/
 │   │   └── user_profile.example.json
-│   └── local/                 # Private local configuration
+│   └── local/                 # Private local configuration (gitignored)
 ├── prompts/
 │   └── system_prompt.txt
 ├── src/
@@ -94,6 +99,31 @@ If your system uses `python3`, run:
 python3 src/main.py
 ```
 
+## Personas and Privacy
+
+RIKO separates the assistant's **persona** from the framework that runs it.
+
+- `config/defaults/behavior.default.json` holds neutral, professional
+  defaults and is published as-is.
+- `config/personas/` holds public example personas (`assistant`, `tutor`).
+  These are deliberately neutral so the repository is safe to share.
+- `config/local/personas/` holds private personas. This folder is
+  gitignored and is never published.
+- `config/local/config.json` selects the active persona with a single
+  field:
+
+  ```json
+  { "persona": "assistant" }
+  ```
+
+Loading order is **defaults -> persona -> local override**, so a local file
+always wins. If a persona file is missing or malformed, RIKO falls back to
+the bundled `assistant` persona instead of crashing.
+
+The important consequence: the *framework* is the project. Any particular
+persona is just configuration, and personal configuration never leaves the
+machine.
+
 ## Configuration and Privacy
 
 RIKO separates default settings, example profiles, and private local configuration.
@@ -110,6 +140,7 @@ Personal profiles, local behaviour overrides, credentials, and other private set
 Run the available tests from the project root:
 
 ```bash
+python src/test_persona_manager.py
 python src/test_prompt_manager.py
 python src/test_conversation_manager.py
 python src/test_prompt_fallback.py
@@ -126,13 +157,14 @@ Planned development includes:
 - Voice synthesis integration using GPT-SoVITS.
 - A modular pipeline connecting language generation, text chunking, and speech synthesis.
 - Improvements to personalization and conversational behaviour.
+- A persona-selection interface.
 - Testing and performance evaluation of the integrated voice pipeline.
 
 **Note:** Speech recognition and voice synthesis are planned components. They should not be considered integrated features until implementation and testing are complete.
 
 ## Project Status
 
-RIKO is under active development. The current focus is on building a clean, modular conversational core before expanding into voice interaction.
+RIKO is under active development. The current focus is on building a clean, modular conversational core with a configurable persona layer before expanding into voice interaction.
 
 ## License
 

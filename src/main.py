@@ -1,4 +1,3 @@
-
 from pathlib import Path
 
 from prompt_manager import PromptManager
@@ -13,25 +12,29 @@ def main():
     prompt_manager = PromptManager(PROJECT_ROOT)
     ollama_client = OllamaClient()
 
+    persona = prompt_manager.get_persona()
+    assistant_name = persona.get("name", "Riko")
+    greeting = persona.get("greeting", "Hello! I'm here.")
+
     conversation = ConversationManager(
         prompt_manager,
         ollama_client
     )
 
-    print("Riko: Hey Amartya! I'm here. Talk to me.")
+    print(f"{assistant_name}: {greeting}")
     print("Type 'exit' to end the conversation.\n")
 
     while True:
         user_message = input("You: ").strip()
 
         if user_message.lower() == "exit":
-            print("Riko: Okay, see you later!")
+            print(f"{assistant_name}: Okay, see you later!")
             break
 
         if not user_message:
             continue
 
-        print("\nRiko: ", end="", flush=True)
+        print(f"\n{assistant_name}: ", end="", flush=True)
 
         try:
             for chunk in conversation.stream_response(

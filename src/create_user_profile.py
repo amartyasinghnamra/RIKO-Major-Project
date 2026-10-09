@@ -11,8 +11,8 @@ PROFILE_PATH = (
 
 DEFAULT_PROFILE = {
     "identity": {
-        "preferred_name": "Amartya",
-        "role": "B.Tech AIML student"
+        "preferred_name": "User",
+        "role": "Student"
     },
     "interests": [
         "Artificial Intelligence",
