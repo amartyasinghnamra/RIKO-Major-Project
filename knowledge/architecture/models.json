@@ -1,0 +1,32 @@
+{
+  "language_model": {
+    "name": "qwen3:4b-instruct",
+    "runtime": "Ollama",
+    "role": "Generates conversational responses",
+    "status": "Used in recent voice-chat tests",
+    "verification": "Check current OllamaClient and runtime configuration for changes."
+  },
+  "speech_recognition": {
+    "library": "Faster-Whisper",
+    "model_size": "small",
+    "device": "cpu",
+    "compute_type": "int8",
+    "role": "Transcribes microphone audio into text",
+    "status": "Used in recent voice-chat tests"
+  },
+  "speech_synthesis": {
+    "engine": "Kokoro ONNX",
+    "model_file": "models/kokoro/kokoro-v1.0.int8.onnx",
+    "voice": "af_sarah",
+    "voice_file": "voices-v1.0.bin",
+    "sample_rate_hz": 24000,
+    "role": "Converts generated response text into speech audio",
+    "status": "Documented in the current development setup"
+  },
+  "accuracy_rules": [
+    "Do not invent model versions, parameter counts, quantization details, or hardware acceleration settings.",
+    "Distinguish the LLM from STT and TTS.",
+    "If live configuration differs from this inventory, prefer verified live configuration.",
+    "If a requested detail is not recorded, say it is not documented."
+  ]
+}
