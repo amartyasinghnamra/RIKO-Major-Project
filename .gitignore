@@ -28,3 +28,21 @@ __pycache__/
 
 # Local cleanup backups
 /cleanup_quarantine/
+
+# Local logs
+/logs/
+
+# Temporary audio experiments — keep locally
+/test_audio_tail.py
+/test_kokoro.py
+/test_kokoro_playback.py
+/test_playback.py
+/test_tts_module.py
+/src/test_fish_audio.py
+
+# Historical backups
+*.bak
+/src/modes/voice_chat_before_stt.py
+
+# Local test recordings
+/tests/stt/*.wav

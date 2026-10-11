@@ -1,9 +1,11 @@
+"""RIKO voice-only companion chat."""
 
-"""RIKO voice-only chat mode."""
 from pathlib import Path
 import sys
 from threading import Event, Thread
 from time import perf_counter
+
+from src.debug_logger import log_event, log_exception
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = str(PROJECT_ROOT / "src")
@@ -15,6 +17,7 @@ from prompt_manager import PromptManager
 from ollama_client import OllamaClient
 from conversation_manager import ConversationManager
 from audio.kokoro.tts import KokoroTTS
+from audio.stt.streaming_voice_input import StreamingVoiceInput
 
 
 def main():
@@ -25,13 +28,13 @@ def main():
         prompt_manager,
         ollama_client,
         mode="voice",
-
     )
 
     persona = prompt_manager.get_persona()
     riko_name = persona.get("name") or "Riko"
 
     tts = KokoroTTS()
+    voice_input = None
 
     warmup_done = Event()
     warmup_state = {"error": None, "seconds": None}
@@ -59,23 +62,47 @@ def main():
         print(f"[RIKO] Could not initialize Kokoro: {error}")
         return
 
-    print(f"{riko_name}: Hello! I'm here whenever you're ready.")
-    print("[RIKO] Voice Chat mode. Type 'exit' to leave.\n")
+    try:
+        voice_input = StreamingVoiceInput(
+            model_size="small",
+            device="cpu",
+            compute_type="int8",
+            language_mode="auto",
+            silence_duration=0.8,
+            energy_threshold=0.001,
+            update_interval=0.8,
+            window_seconds=6.0,
+        )
+        print("[RIKO] Microphone input is ready.")
+    except Exception as error:
+        print(f"[RIKO] Could not initialize microphone STT: {error}")
+        tts.stop()
+        return
+
+    print(f"\n{riko_name}: Hello! I'm here whenever you're ready.")
+    print("[RIKO] Voice Chat active. Speak naturally.")
+    print("[RIKO] Press Ctrl+C to end the conversation.\n")
 
     try:
         while True:
             try:
-                user_message = input("You: ").strip()
-            except (EOFError, KeyboardInterrupt):
-                print(f"\n{riko_name}: See you later!")
+                user_message = voice_input.listen_once()
+            except KeyboardInterrupt:
+                print(f"\n\n{riko_name}: See you later!")
                 break
-
-            if user_message.lower() == "exit":
-                print(f"{riko_name}: See you later!")
-                break
-
-            if not user_message:
+            except Exception as error:
+                print(f"\n[RIKO STT error] {error}")
+                print("[RIKO] Trying to listen again...\n")
                 continue
+
+            if not user_message or not user_message.strip():
+                continue
+
+            log_event(
+                "VOICE",
+                "Transcript ready; beginning response generation",
+                transcript_chars=len(user_message),
+            )
 
             warmup_done.wait()
 
@@ -91,9 +118,21 @@ def main():
 
             print(f"\n{riko_name}: ", end="", flush=True)
             started = perf_counter()
+            first_token_seen = False
 
             def visible_text_stream():
+                nonlocal first_token_seen
                 for chunk in conversation.stream_response(user_message):
+                    if chunk and not first_token_seen:
+                        first_token_seen = True
+                        log_event(
+                            "VOICE",
+                            "First LLM text chunk received",
+                            seconds_since_response_start=round(
+                                perf_counter() - started, 3
+                            ),
+                            chunk_chars=len(chunk),
+                        )
                     print(chunk, end="", flush=True)
                     yield chunk
 
@@ -104,8 +143,13 @@ def main():
                     "\n[Latency] Response and playback finished: "
                     f"{elapsed:.2f} s\n"
                 )
+            except KeyboardInterrupt:
+                print("\n[RIKO] Conversation interrupted.")
+                break
             except Exception as error:
+                log_exception("VOICE", "Voice response failed", error)
                 print(f"\n[RIKO voice error] {error}\n")
+
     finally:
         tts.stop()
 
