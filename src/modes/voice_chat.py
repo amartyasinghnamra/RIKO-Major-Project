@@ -64,7 +64,7 @@ def main():
 
     try:
         voice_input = StreamingVoiceInput(
-            model_size="small",
+            model_size="base",
             device="cpu",
             compute_type="int8",
             language_mode="auto",

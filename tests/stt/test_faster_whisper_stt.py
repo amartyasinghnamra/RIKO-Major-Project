@@ -41,7 +41,7 @@ class FasterWhisperSTTTests(unittest.TestCase):
         self.assertEqual(options["vad_parameters"]["threshold"], 0.35)
         self.assertEqual(options["vad_parameters"]["speech_pad_ms"], 700)
         self.assertFalse(options["condition_on_previous_text"])
-        self.assertEqual(options["initial_prompt"], "RIKO, GATE, Ollama, Kokoro, numpy, Hinglish")
+        self.assertNotIn("initial_prompt", options)
 
     def test_language_modes(self):
         for mode, expected in (("auto", None), ("hinglish", None), ("english", "en"), ("hindi", "hi")):
@@ -63,7 +63,7 @@ class FasterWhisperSTTTests(unittest.TestCase):
         with patch.dict(sys.modules, {"faster_whisper": fake_module}):
             stt.transcribe(self.audio)
             stt.transcribe(self.audio)
-        fake_module.WhisperModel.assert_called_once_with("small", device="cpu", compute_type="int8")
+        fake_module.WhisperModel.assert_called_once_with("base", device="cpu", compute_type="int8")
         self.assertEqual(self.model.transcribe.call_count, 2)
 
     def test_empty_and_silent_audio_do_not_load_model(self):

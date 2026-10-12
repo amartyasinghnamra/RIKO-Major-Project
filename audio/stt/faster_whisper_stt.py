@@ -28,7 +28,7 @@ class FasterWhisperSTT:
 
     def __init__(
         self,
-        model_size: str = "small",
+        model_size: str = "base",
         device: str = "cpu",
         compute_type: str = "int8",
         language: str | None = None,

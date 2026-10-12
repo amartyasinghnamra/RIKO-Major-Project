@@ -3,9 +3,13 @@ from conversation_manager import ConversationManager
 
 
 class FakePromptManager:
+    def __init__(self):
+        self.requested_modes = []
+
     def build_prompt(self, mode="text"):
         assert mode in ("text", "voice")
-        return "You are Riko, a helpful AI companion."
+        self.requested_modes.append(mode)
+        return f"Prompt for {mode} mode."
 
 class FakeOllamaClient:
     def stream_response(self, messages):
@@ -45,7 +49,18 @@ def main():
 
     # System prompt + two user messages + two assistant messages.
     assert len(conversation.messages) == 5
+    prompt_manager = FakePromptManager()
+    ollama_client = FakeOllamaClient()
+    text_conversation = ConversationManager(
+        prompt_manager, ollama_client
+    )
+    voice_conversation = ConversationManager(
+        prompt_manager, ollama_client, mode="voice"
+    )
 
+    assert prompt_manager.requested_modes == ["text", "voice"]
+    assert text_conversation.messages[0]["content"] == "Prompt for text mode."
+    assert voice_conversation.messages[0]["content"] == "Prompt for voice mode."
     assert conversation.messages[0]["role"] == "system"
     assert conversation.messages[1]["role"] == "user"
     assert conversation.messages[2]["role"] == "assistant"

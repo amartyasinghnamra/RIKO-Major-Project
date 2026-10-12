@@ -10,7 +10,7 @@ class ConversationManager:
         self.ollama_client = ollama_client
         self.messages = [{
             "role": "system",
-            "content": prompt_manager.build_prompt(),
+            "content": prompt_manager.build_prompt(mode=mode),
         }]
 
     def _stream_and_record(self, messages):
