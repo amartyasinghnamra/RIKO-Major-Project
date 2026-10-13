@@ -133,7 +133,6 @@ class StreamingVoiceInput:
 
                 except Exception as exc:
                     log_exception("STT", "Partial transcription failed", exc)
-                    print(f"\n[RIKO partial STT warning] {exc}")
 
                 finally:
                     partial_queue.task_done()
@@ -230,7 +229,6 @@ class StreamingVoiceInput:
                                 speech_started_at - listen_started, 3
                             ),
                         )
-                        print("[RIKO] Speech detected...")
 
                     now = monotonic()
 
@@ -257,7 +255,6 @@ class StreamingVoiceInput:
                                 2,
                             ),
                         )
-                        print("\n[RIKO] Speech boundary detected.")
                         break
 
         except KeyboardInterrupt:

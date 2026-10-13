@@ -14,6 +14,7 @@ if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
 from prompt_manager import PromptManager
+from settings_manager import SettingsManager
 from ollama_client import OllamaClient
 from conversation_manager import ConversationManager
 from audio.kokoro.tts import KokoroTTS
@@ -29,11 +30,19 @@ def main():
         ollama_client,
         mode="voice",
     )
+    conversation.enable_voice_status = True
 
     persona = prompt_manager.get_persona()
     riko_name = persona.get("name") or "Riko"
 
-    tts = KokoroTTS()
+    settings = SettingsManager(PROJECT_ROOT)
+    tts_settings = settings.get_tts_settings()
+
+    tts = KokoroTTS(
+        voice=settings.get_tts_voice(),
+        speed=tts_settings.get("speed", 1.0),
+        lang=tts_settings.get("language", "en-us"),
+    )
     voice_input = None
 
     warmup_done = Event()
@@ -110,9 +119,10 @@ def main():
                 print(f"[RIKO warm-up warning] {warmup_state['error']}")
                 warmup_state["error"] = None
             elif warmup_state["seconds"] is not None:
-                print(
-                    "[Latency] Startup warm-up: "
-                    f"{warmup_state['seconds']:.2f} s"
+                log_event(
+                    "VOICE",
+                    "Startup warm-up completed",
+                    seconds=round(warmup_state["seconds"], 3),
                 )
                 warmup_state["seconds"] = None
 
@@ -123,6 +133,17 @@ def main():
             def visible_text_stream():
                 nonlocal first_token_seen
                 for chunk in conversation.stream_response(user_message):
+                    if (
+                        isinstance(chunk, tuple)
+                        and len(chunk) == 2
+                        and chunk[0] == "__RIKO_STATUS__"
+                    ):
+                        yield chunk
+                        continue
+
+                    if not isinstance(chunk, str):
+                        continue
+
                     if chunk and not first_token_seen:
                         first_token_seen = True
                         log_event(
@@ -139,16 +160,16 @@ def main():
             try:
                 tts.speak_stream(visible_text_stream())
                 elapsed = perf_counter() - started
-                print(
-                    "\n[Latency] Response and playback finished: "
-                    f"{elapsed:.2f} s\n"
+                log_event(
+                    "VOICE",
+                    "Response and playback finished",
+                    seconds=round(elapsed, 3),
                 )
             except KeyboardInterrupt:
                 print("\n[RIKO] Conversation interrupted.")
                 break
             except Exception as error:
                 log_exception("VOICE", "Voice response failed", error)
-                print(f"\n[RIKO voice error] {error}\n")
 
     finally:
         tts.stop()

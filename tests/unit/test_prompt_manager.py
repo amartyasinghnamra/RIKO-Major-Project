@@ -1,4 +1,3 @@
-
 import json
 import tempfile
 from pathlib import Path
@@ -6,7 +5,7 @@ from pathlib import Path
 from prompt_manager import PromptManager
 
 
-def main():
+def test_build_prompt_uses_persona_profile_and_behavior():
     with tempfile.TemporaryDirectory() as temp_dir:
         root = Path(temp_dir)
 
@@ -46,8 +45,7 @@ def main():
             encoding="utf-8",
         )
 
-        manager = PromptManager(root)
-        prompt = manager.build_prompt()
+        prompt = PromptManager(root).build_prompt()
 
         assert "You are Riko" in prompt
         assert "Neutral assistant." in prompt
@@ -63,13 +61,3 @@ def main():
             assert placeholder not in prompt, (
                 f"Unfilled placeholder: {placeholder}"
             )
-
-        print("PASS: Prompt uses the example profile.")
-        print("PASS: Persona and default behaviour are included.")
-        print("PASS: No unfilled placeholders remain.")
-
-    print("All PromptManager tests passed!")
-
-
-if __name__ == "__main__":
-    main()

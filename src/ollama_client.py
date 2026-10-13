@@ -109,3 +109,61 @@ class OllamaClient:
                             "total_duration_ns": data.get("total_duration"),
                         })
                     break
+
+
+    def stream_chat_events(self, messages, *, tools=None):
+        """Yield streamed text events and a final aggregated tool-call event."""
+        started = perf_counter()
+        tool_calls = {}
+
+        with self._post_chat(messages, stream=True, tools=tools) as response:
+            for line in response:
+                if not line.strip():
+                    continue
+                try:
+                    data = json.loads(line.decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError) as error:
+                    raise RuntimeError(
+                        "Ollama returned an invalid streaming response."
+                    ) from error
+
+                message = data.get("message", {})
+                content = message.get("content", "")
+                if content:
+                    yield {"type": "content", "content": content}
+
+                for position, call in enumerate(message.get("tool_calls") or []):
+                    if not isinstance(call, dict):
+                        continue
+                    index = call.get("index", position)
+                    current = tool_calls.setdefault(index, {
+                        "type": "function",
+                        "function": {"name": "", "arguments": {}},
+                    })
+                    function = call.get("function") or {}
+                    name = function.get("name")
+                    if name:
+                        current["function"]["name"] = name
+
+                    arguments = function.get("arguments")
+                    if isinstance(arguments, dict):
+                        current["function"]["arguments"].update(arguments)
+                    elif isinstance(arguments, str):
+                        # Some streaming backends send arguments as JSON text.
+                        try:
+                            parsed = json.loads(arguments)
+                            if isinstance(parsed, dict):
+                                current["function"]["arguments"].update(parsed)
+                        except json.JSONDecodeError:
+                            current["function"]["arguments_raw"] = arguments
+
+                if data.get("done", False):
+                    break
+
+        if tool_calls:
+            yield {
+                "type": "tool_calls",
+                "tool_calls": list(tool_calls.values()),
+                "seconds": round(perf_counter() - started, 3),
+            }
+

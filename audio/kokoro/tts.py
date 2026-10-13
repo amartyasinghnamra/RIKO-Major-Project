@@ -211,6 +211,23 @@ class KokoroTTS:
 
             try:
                 for token in token_iterator:
+                    # A status event is spoken, but never included in
+                    # the returned assistant response or conversation text.
+                    if (
+                        isinstance(token, tuple)
+                        and len(token) == 2
+                        and token[0] == "__RIKO_STATUS__"
+                    ):
+                        status = remove_emojis(str(token[1])).strip()
+                        if status:
+                            # Preserve ordering if an answer fragment is
+                            # waiting in the text buffer.
+                            if buffer.strip():
+                                text_queue.put(buffer.strip())
+                                buffer = ""
+                            text_queue.put(status)
+                        continue
+
                     if not isinstance(token, str):
                         continue
 

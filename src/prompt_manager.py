@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 
+from settings_manager import SettingsManager
+
 
 DEFAULT_PERSONA = "assistant"
 
@@ -38,6 +40,7 @@ class PromptManager:
         self.local_config_path = (
             config_dir / "local" / "config.json"
         )
+        self.settings = SettingsManager(self.project_root)
 
         self.public_personas_dir = config_dir / "personas"
         self.local_personas_dir = config_dir / "local" / "personas"
@@ -59,21 +62,58 @@ class PromptManager:
             return json.load(file)
 
     def resolve_persona_name(self):
-        """Resolve persona from local config or use the default."""
-        if self.local_config_path.exists():
-            try:
-                local_config = self.load_json(
-                    self.local_config_path
-                )
-            except (json.JSONDecodeError, OSError):
-                local_config = {}
+        """Resolve the selected persona from shared local settings."""
+        return self.settings.get_persona()
 
-            name = local_config.get("persona")
+    def list_personas(self):
+        """List valid local and bundled persona definitions."""
+        personas = {}
 
-            if isinstance(name, str) and name.strip():
-                return name.strip()
+        for directory in (
+            self.public_personas_dir,
+            self.local_personas_dir,
+        ):
+            if not directory.is_dir():
+                continue
 
-        return DEFAULT_PERSONA
+            for path in sorted(directory.glob("*.json")):
+                try:
+                    persona = self.load_json(path)
+                except (json.JSONDecodeError, OSError):
+                    continue
+
+                if not isinstance(persona, dict):
+                    continue
+
+                name = persona.get("name")
+                if not isinstance(name, str) or not name.strip():
+                    continue
+
+                personas[path.stem] = {
+                    "id": path.stem,
+                    "name": name.strip(),
+                    "description": str(
+                        persona.get("description", "")
+                    ),
+                }
+
+        return [
+            personas[key] for key in sorted(personas)
+        ]
+
+    def select_persona(self, persona_id):
+        """Validate and persist a persona selection."""
+        available_ids = {
+            persona["id"] for persona in self.list_personas()
+        }
+
+        if not isinstance(persona_id, str) or persona_id not in available_ids:
+            raise ValueError(
+                f"Unknown persona {persona_id!r}. "
+                f"Available personas: {', '.join(sorted(available_ids))}"
+            )
+
+        self.settings.set_persona(persona_id)
 
     def load_persona(self, persona_name):
         """Load a local persona first, then a bundled persona."""
