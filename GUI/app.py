@@ -38,6 +38,7 @@ from prompt_manager import PromptManager
 from settings_manager import SettingsManager
 from main import create_chat_session, run_text_chat, run_voice_chat
 from user_profile import default_profile, normalize_profile
+from behavior_preferences import BEHAVIOR_CONTROLS, RESPONSE_STYLE_OPTIONS
 
 
 COLORS = {
@@ -1397,12 +1398,14 @@ class RikoDesktop:
                         voice=self.settings.get_tts_voice(),
                         speed=float(settings.get("speed", 1.0)),
                         lang=settings.get("language", "en-us"),
+                        cache_enabled=self.settings.get_tts_cache_enabled(),
                     )
                 else:
                     settings = self.settings.get_tts_settings()
                     self.read_aloud_tts.voice = self.settings.get_tts_voice()
                     self.read_aloud_tts.speed = float(settings.get("speed", 1.0))
                     self.read_aloud_tts.lang = settings.get("language", "en-us")
+                    self.read_aloud_tts.cache_enabled = self.settings.get_tts_cache_enabled()
                 tts = self.read_aloud_tts
             tts.speak_text(text, cancel_event=stop_event)
         except Exception as exc:
@@ -2145,6 +2148,53 @@ class RikoDesktop:
             wraplength=420,
         ).pack(anchor="w", pady=(0, 14))
 
+        cache_row = tk.Frame(body, bg=COLORS["background"])
+        cache_row.pack(fill="x", pady=(0, 2))
+        self.tts_cache_var = tk.BooleanVar(
+            value=self.settings.get_tts_cache_enabled(),
+        )
+        tk.Checkbutton(
+            cache_row,
+            text="Cache Read aloud audio locally",
+            variable=self.tts_cache_var,
+            bg=COLORS["background"],
+            fg=COLORS["text"],
+            activebackground=COLORS["background"],
+            activeforeground=COLORS["text"],
+            selectcolor=COLORS["panel_lighter"],
+            font=(UI_FONT_FAMILY, 9, "bold"),
+            anchor="w",
+            highlightthickness=0,
+        ).pack(side="left", fill="x", expand=True)
+        self._button(
+            cache_row,
+            "Clear cache",
+            self.clear_audio_cache,
+            bg=COLORS["panel"],
+            fg=COLORS["muted"],
+            padx=10,
+            pady=5,
+        ).pack(side="right")
+        tk.Label(
+            body,
+            text="Off by default. When enabled, repeated Read aloud phrases reuse local audio files. Cache is limited to 128 MB and can be cleared here.",
+            bg=COLORS["background"],
+            fg=COLORS["quiet"],
+            font=(UI_FONT_FAMILY, 8),
+            justify="left",
+            wraplength=420,
+        ).pack(anchor="w", pady=(0, 14))
+
+        self._button(
+            body,
+            "Tune RIKO's personality",
+            self.open_behavior_preferences,
+            bg=COLORS["panel"],
+            fg=COLORS["text"],
+            padx=14,
+            pady=9,
+        ).pack(fill="x", pady=(0, 14))
+
         personas = self.prompts.list_personas()
         self.persona_choice = tk.StringVar(value=self.settings.get_persona())
         self._field_label(body, "Conversation style")
@@ -2281,10 +2331,256 @@ class RikoDesktop:
             self.settings.set_text_to_voice_enabled(
                 bool(self.text_to_voice_var.get())
             )
+            self.settings.set_tts_cache_enabled(bool(self.tts_cache_var.get()))
         except (ValueError, OSError) as error:
             messagebox.showerror("Could not save preferences", str(error), parent=self.settings_window)
             return
         self.events.put(("settings_saved", None))
+
+    def clear_audio_cache(self) -> None:
+        if not messagebox.askyesno(
+            "Clear cached speech",
+            "Delete RIKO's locally cached Read aloud audio? This cannot be undone.",
+            parent=self.settings_window,
+        ):
+            return
+        try:
+            from audio.kokoro.tts import DEFAULT_CACHE, KokoroTTS
+
+            removed = KokoroTTS.clear_cache(DEFAULT_CACHE)
+            messagebox.showinfo(
+                "Speech cache cleared",
+                f"Removed {removed} cached audio file(s).",
+                parent=self.settings_window,
+            )
+        except OSError as error:
+            messagebox.showerror(
+                "Could not clear speech cache",
+                str(error),
+                parent=self.settings_window,
+            )
+
+    def open_behavior_preferences(self) -> None:
+        window = tk.Toplevel(self.root)
+        window.title("RIKO personality preferences")
+        window.configure(bg=COLORS["background"])
+        window.transient(self.root)
+        window.geometry("560x690")
+        window.minsize(500, 560)
+
+        header = tk.Frame(window, bg=COLORS["background"])
+        header.pack(fill="x", padx=24, pady=(20, 8))
+        tk.Label(
+            header,
+            text="TUNE RIKO'S STYLE",
+            bg=COLORS["background"],
+            fg=COLORS["accent"],
+            font=(UI_FONT_FAMILY, 8, "bold"),
+        ).pack(anchor="w")
+        tk.Label(
+            header,
+            text="A little more you",
+            bg=COLORS["background"],
+            fg=COLORS["text"],
+            font=(UI_FONT_FAMILY, 19, "bold"),
+        ).pack(anchor="w", pady=(4, 2))
+        tk.Label(
+            header,
+            text="These sliders shape the next reply. They never override your current request, and serious conversations stay grounded.",
+            bg=COLORS["background"],
+            fg=COLORS["muted"],
+            font=(UI_FONT_FAMILY, 9),
+            justify="left",
+            wraplength=500,
+        ).pack(anchor="w")
+
+        scroll_frame = tk.Frame(window, bg=COLORS["background"])
+        scroll_frame.pack(fill="both", expand=True, padx=18, pady=(8, 4))
+        canvas = tk.Canvas(
+            scroll_frame,
+            bg=COLORS["background"],
+            highlightthickness=0,
+            borderwidth=0,
+        )
+        scrollbar = ttk.Scrollbar(scroll_frame, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        content = tk.Frame(canvas, bg=COLORS["background"])
+        content_window = canvas.create_window((0, 0), window=content, anchor="nw")
+        content.bind(
+            "<Configure>",
+            lambda _event: canvas.configure(scrollregion=canvas.bbox("all")),
+        )
+        canvas.bind(
+            "<Configure>",
+            lambda event: canvas.itemconfigure(content_window, width=event.width),
+        )
+        canvas.bind(
+            "<MouseWheel>",
+            lambda event: canvas.yview_scroll(-int(event.delta / 120), "units"),
+        )
+        canvas.bind(
+            "<Button-4>", lambda _event: canvas.yview_scroll(-1, "units")
+        )
+        canvas.bind(
+            "<Button-5>", lambda _event: canvas.yview_scroll(1, "units")
+        )
+
+        try:
+            values = self.prompts.get_behavior_preferences()
+        except (OSError, ValueError) as error:
+            messagebox.showerror("Could not load personality settings", str(error), parent=window)
+            window.destroy()
+            return
+
+        slider_vars = {}
+        slider_labels = {}
+        for key, _section, label in BEHAVIOR_CONTROLS:
+            row = tk.Frame(
+                content,
+                bg=COLORS["panel"],
+                highlightthickness=1,
+                highlightbackground=COLORS["border"],
+            )
+            row.pack(fill="x", padx=5, pady=5)
+            title_row = tk.Frame(row, bg=COLORS["panel"])
+            title_row.pack(fill="x", padx=12, pady=(8, 0))
+            tk.Label(
+                title_row,
+                text=label,
+                bg=COLORS["panel"],
+                fg=COLORS["text"],
+                font=(UI_FONT_FAMILY, 9, "bold"),
+                anchor="w",
+            ).pack(side="left", fill="x", expand=True)
+            value_label = tk.Label(
+                title_row,
+                text=f"{values[key]}/10",
+                bg=COLORS["panel"],
+                fg=COLORS["accent"],
+                font=(UI_FONT_FAMILY, 8, "bold"),
+                width=6,
+                anchor="e",
+            )
+            value_label.pack(side="right")
+            slider_labels[key] = value_label
+            variable = tk.IntVar(value=values[key])
+            slider_vars[key] = variable
+            tk.Scale(
+                row,
+                variable=variable,
+                from_=0,
+                to=10,
+                resolution=1,
+                orient="horizontal",
+                showvalue=False,
+                bg=COLORS["panel"],
+                fg=COLORS["muted"],
+                troughcolor=COLORS["panel_lighter"],
+                activebackground=COLORS["accent"],
+                highlightthickness=0,
+                command=lambda value, label=value_label: label.configure(
+                    text=f"{int(float(value))}/10"
+                ),
+            ).pack(fill="x", padx=8, pady=(0, 2))
+            scale_hint = tk.Frame(row, bg=COLORS["panel"])
+            scale_hint.pack(fill="x", padx=12, pady=(0, 7))
+            tk.Label(
+                scale_hint,
+                text="Subtle",
+                bg=COLORS["panel"],
+                fg=COLORS["quiet"],
+                font=(UI_FONT_FAMILY, 7),
+            ).pack(side="left")
+            tk.Label(
+                scale_hint,
+                text="Strong",
+                bg=COLORS["panel"],
+                fg=COLORS["quiet"],
+                font=(UI_FONT_FAMILY, 7),
+            ).pack(side="right")
+
+        tk.Label(
+            content,
+            text="Response style",
+            bg=COLORS["background"],
+            fg=COLORS["text"],
+            font=(UI_FONT_FAMILY, 9, "bold"),
+            anchor="w",
+        ).pack(fill="x", padx=7, pady=(14, 6))
+        style_by_label = {"Keep current style": values["response_style"]}
+        style_by_label.update(RESPONSE_STYLE_OPTIONS)
+        current_label = next(
+            (
+                label
+                for label, style in RESPONSE_STYLE_OPTIONS.items()
+                if style == values["response_style"]
+            ),
+            "Keep current style",
+        )
+        style_var = tk.StringVar(value=current_label)
+        style_combo = ttk.Combobox(
+            content,
+            textvariable=style_var,
+            values=list(style_by_label),
+            state="readonly",
+            style="Riko.TCombobox",
+        )
+        style_combo.pack(fill="x", padx=7, pady=(0, 5))
+
+        actions = tk.Frame(window, bg=COLORS["background"])
+        actions.pack(fill="x", padx=24, pady=(6, 18))
+
+        def reset_to_persona() -> None:
+            try:
+                self.prompts.reset_behavior_preferences()
+                refreshed = self.prompts.get_behavior_preferences()
+                for key, variable in slider_vars.items():
+                    variable.set(refreshed[key])
+                    slider_labels[key].configure(text=f"{refreshed[key]}/10")
+                style_var.set(next(
+                    (label for label, style in RESPONSE_STYLE_OPTIONS.items()
+                     if style == refreshed["response_style"]),
+                    "Keep current style",
+                ))
+                style_by_label["Keep current style"] = refreshed["response_style"]
+                self.status_var.set("Personality controls reset to the selected persona.")
+            except (OSError, ValueError) as error:
+                messagebox.showerror("Could not reset personality", str(error), parent=window)
+
+        def save_behavior() -> None:
+            selected_style = style_var.get()
+            preferences = {key: variable.get() for key, variable in slider_vars.items()}
+            preferences["response_style"] = style_by_label[selected_style]
+            try:
+                self.prompts.save_behavior_preferences(preferences)
+            except (OSError, TypeError, ValueError) as error:
+                messagebox.showerror("Could not save personality", str(error), parent=window)
+                return
+            self.status_var.set("Personality preferences saved for the next reply.")
+            window.destroy()
+
+        self._button(
+            actions,
+            "Reset to persona",
+            reset_to_persona,
+            bg=COLORS["panel"],
+            fg=COLORS["muted"],
+            padx=12,
+            pady=9,
+        ).pack(side="left")
+        self._button(
+            actions,
+            "Save style",
+            save_behavior,
+            bg=COLORS["accent"],
+            fg="#17131f",
+            padx=16,
+            pady=9,
+            font=(UI_FONT_FAMILY, 9, "bold"),
+        ).pack(side="right")
+        self._schedule_zoom()
 
     def open_profile(self) -> None:
         try:

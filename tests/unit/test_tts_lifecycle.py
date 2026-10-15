@@ -2,6 +2,7 @@
 
 import threading
 
+import numpy as np
 import pytest
 
 from audio.playback import AudioPlayback
@@ -242,3 +243,101 @@ def test_speak_text_skips_synthesis_if_cancellation_was_requested():
     cancel_event.set()
 
     tts.speak_text("Cancelled before playback", cancel_event=cancel_event)
+
+
+def test_read_aloud_cache_reuses_audio_and_is_sensitive_to_text_and_voice(tmp_path):
+    model = tmp_path / "model.onnx"
+    voices = tmp_path / "voices.bin"
+    model.write_bytes(b"model")
+    voices.write_bytes(b"voices")
+
+    class FakeKokoro:
+        calls = 0
+
+        def create(self, _text, **_kwargs):
+            self.calls += 1
+            return np.asarray([0.1, 0.2, 0.3], dtype=np.float32), 24000
+
+    engine = FakeKokoro()
+    tts = KokoroTTS(
+        model_path=model,
+        voices_path=voices,
+        cache_enabled=True,
+        cache_dir=tmp_path / "cache",
+    )
+    tts._tts = engine
+
+    first, first_rate = tts.synthesize("Hello there.")
+    second, second_rate = tts.synthesize("Hello there.")
+
+    np.testing.assert_array_equal(first, second)
+    assert first_rate == second_rate == 24000
+    assert engine.calls == 1
+    assert len(list((tmp_path / "cache").glob("riko-*.npz"))) == 1
+
+    tts.voice = "af_sky"
+    tts.synthesize("Hello there.")
+    tts.synthesize("Different phrase.")
+    assert engine.calls == 3
+    assert len(list((tmp_path / "cache").glob("riko-*.npz"))) == 3
+
+
+def test_disabled_or_unavailable_audio_cache_never_blocks_synthesis(tmp_path):
+    model = tmp_path / "model.onnx"
+    voices = tmp_path / "voices.bin"
+    model.write_bytes(b"model")
+    voices.write_bytes(b"voices")
+
+    class FakeKokoro:
+        calls = 0
+
+        def create(self, _text, **_kwargs):
+            self.calls += 1
+            return np.asarray([0.2, 0.3], dtype=np.float32), 24000
+
+    engine = FakeKokoro()
+    cache_parent_is_file = tmp_path / "not-a-directory"
+    cache_parent_is_file.write_text("keep me", encoding="utf-8")
+    tts = KokoroTTS(
+        model_path=model,
+        voices_path=voices,
+        cache_enabled=False,
+        cache_dir=cache_parent_is_file / "cache",
+    )
+    tts._tts = engine
+
+    tts.synthesize("Still works.")
+    tts.synthesize("Still works.")
+    assert engine.calls == 2
+    assert cache_parent_is_file.read_text(encoding="utf-8") == "keep me"
+
+
+def test_audio_cache_prunes_only_its_own_entries_and_can_be_cleared(tmp_path):
+    model = tmp_path / "model.onnx"
+    voices = tmp_path / "voices.bin"
+    model.write_bytes(b"model")
+    voices.write_bytes(b"voices")
+    cache = tmp_path / "cache"
+
+    class FakeKokoro:
+        def create(self, _text, **_kwargs):
+            return np.ones(32, dtype=np.float32), 24000
+
+    tts = KokoroTTS(
+        model_path=model,
+        voices_path=voices,
+        cache_enabled=True,
+        cache_dir=cache,
+        max_cache_bytes=1,
+    )
+    tts._tts = FakeKokoro()
+    tts.synthesize("Cache is bounded.")
+    assert list(cache.glob("riko-*.npz")) == []
+
+    cache.mkdir(exist_ok=True)
+    (cache / "user-note.txt").write_text("preserve", encoding="utf-8")
+    for name in ("riko-a.npz", "other.npz"):
+        (cache / name).write_bytes(b"cache")
+    assert KokoroTTS.clear_cache(cache) == 1
+    assert (cache / "user-note.txt").read_text(encoding="utf-8") == "preserve"
+    assert (cache / "other.npz").exists()

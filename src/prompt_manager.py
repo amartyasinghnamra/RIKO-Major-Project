@@ -5,6 +5,11 @@ from pathlib import Path
 
 from settings_manager import SettingsManager
 from user_profile import normalize_profile
+from behavior_preferences import (
+    extract_behavior_preferences,
+    format_behavior_instructions,
+    validate_behavior_preferences,
+)
 
 
 DEFAULT_PERSONA = "assistant"
@@ -153,7 +158,7 @@ class PromptManager:
             "behavior": {},
         }
 
-    def load_behavior(self, persona):
+    def load_behavior(self, persona, *, include_local=True):
         """Merge default, persona-specific, and local behavior."""
         behavior = {}
 
@@ -169,13 +174,75 @@ class PromptManager:
                 behavior, persona_behavior
             )
 
-        if self.local_behavior_path.exists():
-            behavior = deep_merge(
-                behavior,
-                self.load_json(self.local_behavior_path),
-            )
+        if include_local and self.local_behavior_path.exists():
+            local_behavior = self.load_json(self.local_behavior_path)
+            if not isinstance(local_behavior, dict):
+                raise ValueError("Local behavior preferences must be a JSON object.")
+            behavior = deep_merge(behavior, local_behavior)
 
         return behavior
+
+    def get_behavior_preferences(self, *, include_local=True):
+        """Return effective slider/dropdown values for the selected persona."""
+        persona = self.get_persona()
+        behavior = self.load_behavior(persona, include_local=include_local)
+        return extract_behavior_preferences(behavior)
+
+    def save_behavior_preferences(self, values):
+        """Save validated user overrides without replacing other local behavior."""
+        patch = validate_behavior_preferences(values)
+        local_behavior = {}
+        if self.local_behavior_path.exists():
+            local_behavior = self.load_json(self.local_behavior_path)
+            if not isinstance(local_behavior, dict):
+                raise ValueError("Local behavior preferences must be a JSON object.")
+        updated = deep_merge(local_behavior, patch)
+        self._write_local_behavior(updated)
+
+    def reset_behavior_preferences(self):
+        """Remove only the UI-owned overrides, preserving custom local fields."""
+        if not self.local_behavior_path.exists():
+            return
+        local_behavior = self.load_json(self.local_behavior_path)
+        if not isinstance(local_behavior, dict):
+            raise ValueError("Local behavior preferences must be a JSON object.")
+        for section, keys in (
+            ("personality", ("cuteness", "playfulness", "teasing", "warmth", "energy", "talkativeness", "spontaneity")),
+            ("conversation", ("spontaneity", "initiative", "emotional_awareness", "reassurance", "response_style")),
+        ):
+            values = local_behavior.get(section)
+            if not isinstance(values, dict):
+                continue
+            for key in keys:
+                values.pop(key, None)
+            if not values:
+                local_behavior.pop(section, None)
+        self._write_local_behavior(local_behavior)
+
+    def _write_local_behavior(self, behavior):
+        import os
+        import tempfile
+
+        self.local_behavior_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = json.dumps(behavior, indent=2, ensure_ascii=False) + "\n"
+        temp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=self.local_behavior_path.parent,
+                prefix=".behavior-",
+                suffix=".tmp",
+                delete=False,
+            ) as file:
+                temp_path = Path(file.name)
+                file.write(payload)
+                file.flush()
+                os.fsync(file.fileno())
+            temp_path.replace(self.local_behavior_path)
+        finally:
+            if temp_path is not None and temp_path.exists():
+                temp_path.unlink()
 
     def resolve_profile(self):
         """Load the selected local profile or a bundled profile preset."""
@@ -312,11 +379,7 @@ class PromptManager:
                 indent=2,
                 ensure_ascii=False,
             ),
-            behavior_instructions=json.dumps(
-                behavior,
-                indent=2,
-                ensure_ascii=False,
-            ),
+            behavior_instructions=format_behavior_instructions(behavior),
         )
 
         style_path = (

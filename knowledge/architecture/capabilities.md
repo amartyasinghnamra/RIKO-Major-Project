@@ -12,6 +12,8 @@ Recently tested:
 - Text-mode Regenerate and optional Kokoro Read aloud actions; assistant Markdown is cleaned before synthesis.
 - Text-mode microphone capture with rolling Faster-Whisper drafts in the composer and a final transcript on manual stop.
 - Personal, bundled Demo, and named local profile selection; supported profile context is inserted through the existing system-prompt template placeholder.
+- Adjustable persona behavior controls for cuteness, playfulness, teasing, affection/warmth, energy, talkativeness, spontaneity, conversation initiative, emotional awareness, reassurance, and response style. Preferences are saved locally and flow through the existing behavior placeholder.
+- Optional, bounded local caching for complete Kokoro Read aloud phrases; disabled by default and clearable in Preferences. Voice Chat continues to use streaming synthesis.
 - Profile schema validation and prompt assembly covered by automated unit tests; these do not verify a live microphone session.
 
 Do not assume the following are implemented or guaranteed:

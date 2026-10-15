@@ -489,6 +489,7 @@ def test_preferences_can_be_saved_during_generation():
             self.voice = None
             self.speed = None
             self.text_to_voice = None
+            self.cache_enabled = None
 
         def set_tts_voice(self, voice, _available):
             self.voice = voice
@@ -498,6 +499,9 @@ def test_preferences_can_be_saved_during_generation():
 
         def set_text_to_voice_enabled(self, enabled):
             self.text_to_voice = enabled
+
+        def set_tts_cache_enabled(self, enabled):
+            self.cache_enabled = enabled
 
     prompts = Prompts()
     settings = Settings()
@@ -510,6 +514,7 @@ def test_preferences_can_be_saved_during_generation():
     desktop.voice_var = Value("af_heart")
     desktop.speed_var = Value(1.25)
     desktop.text_to_voice_var = Value(True)
+    desktop.tts_cache_var = Value(False)
     desktop.voice_values = ["af_heart"]
     desktop.settings_window = None
     desktop.events = queue.Queue()
@@ -520,6 +525,7 @@ def test_preferences_can_be_saved_during_generation():
     assert settings.voice == "af_heart"
     assert settings.speed == 1.25
     assert settings.text_to_voice is True
+    assert settings.cache_enabled is False
     assert desktop.events.get_nowait() == ("settings_saved", None)
 
 

@@ -16,6 +16,8 @@ Prompt files:
 Profile selection and data:
 - SettingsManager stores the active profile ID in config/local/config.json; it defaults to "user" for existing installations.
 - The "text_to_voice_enabled" setting defaults to true and controls whether text-mode assistant replies expose a manual Kokoro Read aloud action. Speech is not automatic.
+- Behavior overrides are stored separately in Git-ignored `config/local/behavior.local.json`. The GUI exposes ten 0–10 style controls and response-style presets; these override persona/default values and are formatted into the existing `{behavior_instructions}` prompt field. The core prompt file is not modified.
+- Optional Kokoro Read aloud audio caching is disabled by default. When enabled in Preferences, complete phrases are stored in Git-ignored `config/local/audio_cache/`, bounded to 128 MiB, and removable with the clear-cache action. Hands-free Voice mode remains streamed and does not use this cache.
 - The private personal profile is config/local/user_profile.json. Additional named local profiles live in config/local/profiles/.
 - The fictional bundled Demo profile is config/examples/profiles/demo.json. It is read-only and only enters the prompt when selected.
 - PromptManager resolves the selected profile, normalizes supported fields with src/user_profile.py, then supplies the profile JSON through the existing {user_profile} template placeholder.

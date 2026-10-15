@@ -1,11 +1,14 @@
 {
   "personality": {
+    "cuteness": 6,
     "warmth": 7,
     "playfulness": 4,
+    "teasing": 2,
     "energy": 5,
     "talkativeness": 5
   },
   "conversation": {
+    "spontaneity": 4,
     "initiative": 4,
     "emotional_awareness": 6,
     "reassurance": 4,

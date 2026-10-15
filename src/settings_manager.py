@@ -20,6 +20,7 @@ DEFAULT_SETTINGS = {
         "voice": "af_sarah",
         "speed": 1.0,
         "language": "en-us",
+        "cache_enabled": False,
     },
 }
 
@@ -168,4 +169,15 @@ class SettingsManager:
 
         settings = self.load()
         settings["tts"]["speed"] = float(speed)
+        self.save(settings)
+
+    def get_tts_cache_enabled(self) -> bool:
+        value = self.get_tts_settings().get("cache_enabled", False)
+        return value if isinstance(value, bool) else False
+
+    def set_tts_cache_enabled(self, enabled: bool) -> None:
+        if not isinstance(enabled, bool):
+            raise TypeError("tts cache_enabled must be a boolean")
+        settings = self.load()
+        settings["tts"]["cache_enabled"] = enabled
         self.save(settings)
