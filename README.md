@@ -65,34 +65,40 @@ This is a conceptual overview; it does not imply that every path or feature is p
 
 ## Requirements
 
-- Windows 10 or newer with CMD, Git, `curl.exe`, and Python 3.10 or newer on `PATH` (Python 3.11 or newer is recommended).
-- Ollama for Windows installed and available on `PATH`. The installer downloads `qwen3:4b-instruct` into Ollama.
+- **Windows:** Windows 10/11, CMD, Git, `curl.exe`, and `winget` for automatic Python/Ollama installation when missing. Python 3.10+ is required; Python 3.11 is installed by winget if needed.
+- **Linux:** Debian/Ubuntu with `apt-get`, `sudo` (or root), and Python 3.10+ available through distribution repositories. The installer installs Python venv/build tools, audio libraries, and Ollama.
 - Internet access and enough free disk space for the Python environment, Ollama model, Kokoro files (about 120 MB combined), and Faster-Whisper model cache.
 - A working microphone and audio output device for live Voice Chat.
 
-## Installation (Windows CMD)
+## Install and run
 
-### 1. Clone and install
+The root-level install scripts create or reuse a project-local `.venv-tts`, install Python requirements, fetch Kokoro model and voice files, install/check Ollama, download `qwen3:4b-instruct`, warm the Faster-Whisper `base` cache, and finally run the separate interactive profile setup. They are designed to be safely rerun. Existing model files are preserved and checked for a minimum size; an existing local profile is preserved unchanged.
+
+### Windows CMD
 
 ```bat
 git clone https://github.com/amartyasinghnamra/RIKO-Major-Project.git RIKO_PROJECT
 cd RIKO_PROJECT
 install.bat
-python src\main.py
+run.bat
 ```
 
-Run these commands in a new CMD window. Install Git, Python, and Ollama first if they are missing. During Python setup, enable **Add python.exe to PATH**. After installing Ollama, open a new CMD window so its PATH entry is available.
+Git is needed to clone the repository. If Python, Ollama, or curl is missing, `install.bat` installs it through `winget`; open a new CMD window and rerun the installer if a newly installed command has not appeared on PATH. Without `winget`, install Python 3.11+, Ollama, and curl from their official installers, then rerun `install.bat`.
 
-`install.bat` creates or reuses `.venv-tts`, installs `requirements.txt`, downloads missing Kokoro assets into `models\kokoro\`, offers the interactive user-profile setup on first install, pulls Ollama's `qwen3:4b-instruct` model, and downloads or verifies the Faster-Whisper `base` model cache. The profile is saved to the ignored `config\local\user_profile.json`; an existing profile is left unchanged. If you decline to save it during installation, you can run `python src\create_user_profile.py` later. The installer then activates `.venv-tts` in the current CMD session. Re-running it reuses the environment and cached models; existing Kokoro files are preserved and checked before use. Downloads require an internet connection.
+### Linux (Debian/Ubuntu)
 
-If CMD does not show `(.venv-tts)` after setup (for example, if another batch file invoked the installer), activate the environment before launching:
-
-```bat
-call .venv-tts\Scripts\activate.bat
-python src\main.py
+```sh
+git clone https://github.com/amartyasinghnamra/RIKO-Major-Project.git RIKO_PROJECT
+cd RIKO_PROJECT
+bash install.sh
+bash run.sh
 ```
 
-The installer downloads Kokoro v1.0 INT8 model and voice assets from the [`kokoro-onnx` v1.0 model release](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0). These model files are ignored by Git and are not added to the repository. Review the upstream model and voice terms before redistribution.
+`install.sh` uses `sudo` to install apt packages and Ollama. Other Linux distributions are not auto-configured; install Python 3.10+, venv/pip, a compiler toolchain, PortAudio, libsndfile, libespeak-ng, curl, and Ollama before adapting/running the script. The virtual environment is always project-local and `run.sh` invokes it without needing shell activation.
+
+### Profile and local assets
+
+After dependency and model setup succeeds, the installer calls `src/create_user_profile.py` as a separate interactive step. You can skip saving at the confirmation prompt and create it later with the `.venv-tts` Python interpreter. The profile lives in Git-ignored `config/local/user_profile.json`; an existing profile is never overwritten by the installer. Project prompts, personas, and other tracked files come from the clone. The installers do not copy the repository tree or process Git-ignored paths. Kokoro assets go under Git-ignored `models/kokoro/`; partial downloads are ignored too. Large/generated model files and local user configuration are not included in Git. Review upstream model and voice terms before redistribution.
 
 The menu offers:
 
@@ -100,7 +106,7 @@ The menu offers:
 - `2` — Voice Chat
 - `0` — Exit
 
-Text Chat requires the local Ollama service and downloaded chat model. Voice Chat additionally requires the speech/audio packages and model assets installed by `install.bat`, plus a microphone and audio output device. Faster-Whisper may use additional model cache space on its first load if the cache was cleared.
+Text Chat requires the local Ollama service and downloaded chat model. Voice Chat additionally requires the speech/audio packages and model assets installed by the OS-specific installer, plus a microphone and audio output device. Faster-Whisper may use additional model cache space on its first load if the cache was cleared.
 
 ## Development and Testing
 
@@ -157,6 +163,9 @@ RIKO-Major-Project/
 │   └── audio/
 ├── requirements.txt
 ├── install.bat
+├── install.sh
+├── run.bat
+├── run.sh
 ├── .gitignore
 └── README.md
 ```

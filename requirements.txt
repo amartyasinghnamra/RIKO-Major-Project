@@ -1,6 +1,5 @@
 # RIKO — direct Python dependencies
-# Tested in the current Windows development environment.
-# Python 3.14.8; dependency wheel availability can vary by Python version.
+# Python 3.10+; package versions are resolved for the selected Python version.
 
 # Local Kokoro text-to-speech
 kokoro-onnx==0.4.7
@@ -13,4 +12,4 @@ sounddevice==0.5.6
 soundfile==0.14.0
 
 # Numerical audio processing
-numpy==2.5.3
+numpy>=2.0.2,<3

@@ -19,6 +19,7 @@ __pycache__/
 # Local Kokoro model weights
 /models/kokoro/*.onnx
 /models/kokoro/*.bin
+/models/kokoro/*.part
 
 # Generated audio and temporary artifacts
 /kokoro_test.wav
