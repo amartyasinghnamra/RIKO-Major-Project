@@ -1,4 +1,4 @@
-# RIKO v0.1.0-preview.1
+# RIKO v0.1.0-preview.2
 
 ## Downloads
 
@@ -28,8 +28,8 @@ These are setup-download packages, not offline bundles. They fetch Python depend
 - Linux package supports x86_64; automatic setup targets Debian/Ubuntu.
 - Voice interruption is a prototype. Acoustic echo cancellation is not implemented; headphones are recommended.
 - Setup requires internet access and several gigabytes of free space for dependencies and model downloads.
-- Automated checks passed: 108 tests, Python compilation, Linux shell syntax, desktop-entry validation, and package-content checks. Complete first-run dependency/model downloads and a live microphone-to-audio session have not been smoke-tested.
+- Automated checks passed: 109 tests, Python compilation, Linux shell syntax, desktop-entry validation, and package-content checks. Complete first-run dependency/model downloads and a live microphone-to-audio session have not been smoke-tested.
 
 ## Publishing
 
-Push the `v0.1.0-preview.1` tag to trigger the packaging workflow. It builds both installers, creates a GitHub prerelease using these notes, and attaches `RIKO-Setup.exe` and `RIKO-x86_64.AppImage` automatically.
+Push the `v0.1.0-preview.2` tag to trigger the packaging workflow. It builds both installers, creates a GitHub prerelease using these notes, and attaches `RIKO-Setup.exe` and `RIKO-x86_64.AppImage` automatically.

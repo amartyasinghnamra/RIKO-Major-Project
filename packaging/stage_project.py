@@ -67,6 +67,12 @@ def stage_project(destination: Path) -> None:
     for relative in SOURCE_DIRS:
         source = PROJECT_ROOT / relative
         if not source.is_dir():
+            if relative == "models":
+                (destination / "models" / "kokoro").mkdir(
+                    parents=True,
+                    exist_ok=True,
+                )
+                continue
             raise FileNotFoundError(f"Required package directory is missing: {source}")
         shutil.copytree(
             source,
@@ -74,6 +80,11 @@ def stage_project(destination: Path) -> None:
             ignore=_ignore,
             dirs_exist_ok=True,
         )
+        if relative == "models":
+            (destination / "models" / "kokoro").mkdir(
+                parents=True,
+                exist_ok=True,
+            )
 
 
 def main() -> None:

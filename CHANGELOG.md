@@ -14,6 +14,7 @@
 ### Fixed
 
 - Corrected the Linux installer partial-download path so failed Kokoro downloads are kept as `.part` files beside their target assets.
+- Made package staging create an empty Kokoro asset directory when a clean checkout has no ignored `models/` directory.
 - Added LF line-ending rules for shell and desktop-entry files, and corrected the AppImage desktop metadata.
 
 ### Documentation
@@ -23,11 +24,11 @@
 
 ### Validation
 
-- Full Python test suite: 108 passed.
+- Full Python test suite: 109 passed, including a clean-checkout staging regression test.
 - Python compilation, Linux shell syntax checks, AppImage desktop-entry validation, package staging checks, and `git diff --check` passed.
 - Built `build/output/RIKO-Setup.exe` with Inno Setup and `build/output/RIKO-x86_64.AppImage` in Ubuntu WSL.
 
 ### Artifact policy
 
 - Generated installers stay under the ignored `build/` directory; model weights and private local profiles are not committed.
-- GitHub Actions uploads Windows and Linux build artifacts for 14 days. It does not publish GitHub Releases automatically.
+- GitHub Actions uploads Windows and Linux build artifacts for 14 days on main/manual runs. Pushing a `v*` tag creates a GitHub Release and attaches both installers.
