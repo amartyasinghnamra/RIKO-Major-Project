@@ -416,7 +416,7 @@ def test_message_bubble_uses_pack_padding_instead_of_invalid_label_option(monkey
     assert body.pack_options["pady"] == (0, 11)
 
 
-def test_assistant_bubble_is_right_aligned_and_uses_available_width(monkeypatch):
+def test_user_and_assistant_bubbles_are_mirrored(monkeypatch):
     rounded_frames = []
 
     class FakeWidget:
@@ -445,13 +445,17 @@ def test_assistant_bubble_is_right_aligned_and_uses_available_width(monkeypatch)
     desktop.workspace = type("Workspace", (), {"winfo_width": lambda _self: 1000})()
     desktop._persona_name = lambda: "Riko"
 
+    desktop._add_message("you", "A user message")
+    user_bubble = rounded_frames[-1]
     desktop._add_message("riko", "A wider response")
+    assistant_bubble = rounded_frames[-1]
 
-    bubble = rounded_frames[-1]
-    assert bubble.pack_options["side"] == "right"
-    assert bubble.pack_options["fill"] == "x"
-    assert bubble.pack_options["expand"] is True
-    assert bubble.pack_options["padx"] == (56, 0)
+    assert user_bubble.pack_options["side"] == "right"
+    assert user_bubble.pack_options["padx"] == (120, 0)
+    assert assistant_bubble.pack_options["side"] == "left"
+    assert assistant_bubble.pack_options["fill"] == "x"
+    assert assistant_bubble.pack_options["expand"] is True
+    assert assistant_bubble.pack_options["padx"] == (0, 56)
 
 
 def test_tool_call_block_starts_collapsed_and_expands_on_click(monkeypatch):

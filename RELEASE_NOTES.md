@@ -1,4 +1,4 @@
-# RIKO v0.1.0-preview.2
+# RIKO v0.1.0-preview.3
 
 ## Downloads
 
@@ -11,7 +11,7 @@ These are setup-download packages, not offline bundles. They fetch Python depend
 
 - Native Tkinter desktop app and terminal mode share the conversation and voice pipelines.
 - Assistant tool lookups appear in collapsible cards in both text and voice sessions.
-- Assistant replies are right-aligned and wider in the chat view.
+- User messages are right-aligned; wider RIKO replies are left-aligned.
 - Local Ollama integration with `qwen3:4b-instruct`, Faster-Whisper transcription, and Kokoro speech synthesis.
 - Local profiles and behavior preferences, response cancellation, Read aloud, and optional bounded speech caching.
 - Windows installer adds Desktop and Start Menu shortcuts that open the GUI without a console window.
@@ -28,8 +28,8 @@ These are setup-download packages, not offline bundles. They fetch Python depend
 - Linux package supports x86_64; automatic setup targets Debian/Ubuntu.
 - Voice interruption is a prototype. Acoustic echo cancellation is not implemented; headphones are recommended.
 - Setup requires internet access and several gigabytes of free space for dependencies and model downloads.
-- Automated checks passed: 109 tests, Python compilation, Linux shell syntax, desktop-entry validation, and package-content checks. Complete first-run dependency/model downloads and a live microphone-to-audio session have not been smoke-tested.
+- Automated checks passed: 109 tests, including clean-checkout packaging, Python compilation, Linux shell syntax, desktop-entry validation, and package-content checks. Complete first-run dependency/model downloads and a live microphone-to-audio session have not been smoke-tested.
 
 ## Publishing
 
-Push the `v0.1.0-preview.2` tag to trigger the packaging workflow. It builds both installers, creates a GitHub prerelease using these notes, and attaches `RIKO-Setup.exe` and `RIKO-x86_64.AppImage` automatically.
+Push the `v0.1.0-preview.3` tag to trigger the packaging workflow. It builds both installers, creates a GitHub prerelease using these notes, and attaches `RIKO-Setup.exe` and `RIKO-x86_64.AppImage` automatically.

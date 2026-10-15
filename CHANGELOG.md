@@ -7,7 +7,7 @@
 - Added structured tool-call events carrying the tool name, arguments, and result paths from the conversation manager.
 - Added collapsed-by-default tool cards inside assistant replies. They expand to show the query or pattern and the files returned, in both text and voice mode.
 - Kept tool events out of Kokoro's text stream, leaving spoken response handling unchanged.
-- Aligned RIKO assistant bubbles to the right, widened them to use most of the chat row, and added a distinct muted-teal surface.
+- Mirrored chat alignment: user messages sit on the right, while wider RIKO replies sit on the left with a distinct muted-teal surface.
 - Added source staging, an Inno Setup definition for Windows, an AppImage first-run launcher for Linux, and a GitHub Actions workflow to build both packages. Packages download dependencies and model assets during setup rather than bundling them.
 - Added neutral text-chat and voice-chat screenshot placeholders to the README.
 

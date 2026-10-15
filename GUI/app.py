@@ -1185,9 +1185,9 @@ class RikoDesktop:
             border_width=1,
         )
         if is_user:
-            bubble.pack(side="left", padx=(0, 120))
+            bubble.pack(side="right", padx=(120, 0))
         else:
-            bubble.pack(side="right", fill="x", expand=True, padx=(56, 0))
+            bubble.pack(side="left", fill="x", expand=True, padx=(0, 56))
         tk.Label(
             bubble,
             text="YOU" if is_user else self._persona_name().upper(),
