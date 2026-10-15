@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800" role="img" aria-labelledby="title desc">
+  <title id="title">Voice chat screenshot placeholder</title>
+  <desc id="desc">Neutral placeholder artwork for a future RIKO voice chat screenshot.</desc>
+  <rect width="1280" height="800" fill="#eef1ef"/>
+  <rect x="72" y="64" width="1136" height="672" rx="18" fill="#fff" stroke="#c9d1ce" stroke-width="3"/>
+  <rect x="72" y="64" width="1136" height="56" rx="18" fill="#e3e9e6"/>
+  <circle cx="106" cy="92" r="8" fill="#9daaa4"/>
+  <circle cx="134" cy="92" r="8" fill="#9daaa4"/>
+  <circle cx="162" cy="92" r="8" fill="#9daaa4"/>
+  <rect x="112" y="160" width="1056" height="420" rx="12" fill="#f7f8f7"/>
+  <path d="M350 370h32l34-64v128l-34-64h-32z" fill="#7c9186"/>
+  <path d="M458 334c30 24 30 48 0 72m40-112c64 46 64 106 0 152m42-192c96 66 96 166 0 232" fill="none" stroke="#7c9186" stroke-width="10" stroke-linecap="round"/>
+  <rect x="112" y="620" width="1056" height="54" rx="10" fill="#f7f8f7" stroke="#d7ddda" stroke-width="2"/>
+  <text x="790" y="360" text-anchor="middle" fill="#34433c" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="700">VOICE CHAT SCREENSHOT</text>
+  <text x="790" y="404" text-anchor="middle" fill="#66756d" font-family="Segoe UI, Arial, sans-serif" font-size="22">Placeholder artwork - replace with a real app capture</text>
+</svg>

@@ -1,8 +1,10 @@
-# RIKO — A Local AI Companion
+# RIKO
 
-RIKO is a modular, local-first AI companion for text and voice interaction. It separates conversation management, prompt handling, language-model access, speech recognition, speech synthesis, and configuration so components can evolve independently.
+**A local-first AI companion for text and voice.** RIKO separates conversation management, prompts, language-model access, speech recognition, speech synthesis, and configuration so its components can evolve independently.
 
-> **Project status:** Active development. Features, interfaces, and setup requirements may change.
+> **Status:** Active development. Features, interfaces, and setup requirements may change.
+
+**On this page:** [Features](#features) | [Install and run](#install-and-run) | [Desktop GUI](#graphical-interface) | [Screenshots](#screenshots) | [Profiles](#profile-and-local-assets) | [Development](#development-and-testing)
 
 ## Features
 
@@ -75,7 +77,9 @@ This is a conceptual overview; it does not imply that every path or feature is p
 
 ## Install and run
 
-The root-level install scripts create or reuse a project-local `.venv-tts`, install Python requirements, fetch Kokoro model and voice files, install/check Ollama, download `qwen3:4b-instruct`, warm the Faster-Whisper `base` cache, and finally run the separate interactive profile setup when no personal profile exists. The profile setup asks before saving. Installers are designed to be safely rerun; existing model files and profiles are preserved.
+The root-level installers create or reuse `.venv-tts`, install Python requirements, fetch Kokoro model and voice files, install or check Ollama, download `qwen3:4b-instruct`, warm the Faster-Whisper `base` cache, and start the separate profile setup if no personal profile exists. Profile setup asks for confirmation before saving. Valid existing model files and profiles are preserved.
+
+> **Linux download retry note:** If a Kokoro asset download fails, the current `install.sh` can leave a temporary file named `${1}.part` in the repository root. Remove that file before retrying the installer.
 
 ### Windows CMD
 
@@ -101,31 +105,65 @@ bash run.sh
 
 ### Graphical interface
 
-RIKO also includes a native desktop GUI built with Python's Tkinter toolkit. The GUI and terminal menu use the shared mode functions in `src/main.py`: `create_chat_session`, `run_text_chat`, and `run_voice_chat`. Voice chat uses the same `VoiceChatSession` as the CLI: its `StreamingVoiceInput` detects utterance boundaries, Faster-Whisper transcribes speech, Ollama streams a reply into Kokoro's speech pipeline, and the barge-in monitor can interrupt playback. The GUI displays the recognized transcript and streamed response while the voice session stays hands-free; the text composer is hidden in Voice mode. Select **Voice** to start listening automatically, then select **Chat** to stop listening and playback. Voice mode has no separate record control. Microphone and speaker access use the operating system's audio devices directly; there is no browser permission prompt or local GUI web server.
+RIKO includes a native Tkinter desktop app. It shares the CLI's chat sessions and audio pipeline; it is not a browser wrapper and does not start a local GUI web server. Microphone and speaker access use the operating system's audio devices directly.
 
-In Text mode, each assistant reply has **Regenerate** and **Read aloud** actions. Regenerate retries the latest text turn using the conversation context that preceded that turn. Read aloud uses Kokoro and removes Markdown formatting before speech synthesis; it can be stopped from the same action button. **Enable text in, voice out** in Preferences controls whether Read aloud is available, and speech only plays when requested. The optional **Cache Read aloud audio locally** preference reuses synthesized phrases and stores them under Git-ignored `config/local/audio_cache/`. It is disabled by default, limited to 128 MB, and can be cleared from Preferences. Caching applies to Read aloud; hands-free Voice mode retains the low-latency streaming pipeline. The microphone button beside **Send** starts a manual recording; Faster-Whisper drafts appear in the composer while recording, and pressing the button again finalizes the transcript there. Review the transcript and press **Send** when ready. Recording is capped at two minutes per take.
+#### Launch the GUI
 
-While a reply is generating, the **Send** button changes to **■ Stop**; pressing it or **Escape** cancels the active Ollama stream and Kokoro playback. In Voice mode the session stays active and returns to listening. Speaking over a voice reply also stops generation and captures the interruption; short commands such as “stop,” “wait,” “pause,” or “hold on” are treated as controls instead of new questions. Headphones are recommended because this prototype does not include acoustic echo cancellation. Preferences can be saved while a reply is running: conversation style applies to the next model turn, while Kokoro voice and pace apply to the next spoken phrase.
+| Platform | Command |
+|---|---|
+| Windows CMD | `run-gui.bat` |
+| Debian/Ubuntu Linux | `bash run-gui.sh` |
 
-The desktop UI can be zoomed from **80% to 160%** using the **− / +** controls beside the persona name. Use **Ctrl + Plus** (or **Ctrl + =**) and **Ctrl + -** to zoom on Windows/Linux, or **Command + Plus/Minus** on macOS; **Ctrl/Command + 0** resets to 100%. Holding Ctrl/Command while using the mouse wheel also zooms. Rounded cards and chat surfaces are drawn with Tkinter Canvas, so this styling does not depend on Windows-only window effects; the operating system continues to draw the title bar.
+#### Text chat
 
-Windows CMD: run-gui.bat
+- **Regenerate** retries the latest text turn with its preceding conversation context.
+- **Read aloud** uses Kokoro on request and strips Markdown formatting before synthesis. The **Enable text in, voice out** preference controls availability.
+- Optional Read aloud caching is off by default, limited to 128 MB, stored under `config/local/audio_cache/`, and clearable from Preferences. Hands-free Voice mode continues to use streaming synthesis.
+- The microphone control creates a Faster-Whisper transcript draft in the composer. Stop recording to finalize it, review it, then send. Each recording is limited to two minutes.
 
-Debian/Ubuntu Linux: bash run-gui.sh
+#### Voice chat
 
-The GUI uses the same `.venv-tts`, Ollama model, Kokoro assets, local persona, speech settings, and selected profile context as the CLI. **Tune RIKO's personality** opens ten 0–10 controls and response-style presets. Teasing remains gentle, affection/warmth is non-romantic by default, and the user's present request and serious tone take priority. Overrides live in Git-ignored `config/local/behavior.local.json` and apply to the next model reply. **Your profile** page lets you select Personal, Demo, or another available profile for prompt context and edit your private personal profile. Close the desktop window to exit.
+Selecting **Voice** starts listening; selecting **Chat** stops listening and playback. Voice mode has no separate record control. The shared `VoiceChatSession` streams Ollama output into Kokoro, displays recognized speech and generated text, and returns to listening after a response is stopped. Speaking over a response can interrupt generation and capture the new utterance. Short commands such as “stop,” “wait,” “pause,” and “hold on” are treated as controls. Headphones are recommended because acoustic echo cancellation is not implemented.
+
+While a reply is generating, **Send** becomes **Stop**. Press it or **Escape** to cancel the active Ollama stream and Kokoro playback; Voice mode stays active and returns to listening.
+
+#### Preferences and display
+
+**Tune RIKO's personality** provides ten 0–10 controls and response-style presets. Teasing remains gentle, affection/warmth is non-romantic by default, and the user's current request and serious tone take priority. Local overrides are saved to `config/local/behavior.local.json` and apply to the next model reply. **Your profile** selects Personal, Demo, or another available profile and edits the private personal profile. Saved conversation style applies to the next model turn; Kokoro voice and pace apply to the next spoken phrase.
+
+Zoom ranges from **80% to 160%** using the **− / +** controls. Keyboard shortcuts are **Ctrl + Plus/=** and **Ctrl + -** on Windows/Linux, **Command + Plus/Minus** on macOS, and **Ctrl/Command + 0** to reset. Holding Ctrl/Command while scrolling also zooms. Tkinter Canvas draws the rounded chat surfaces; the operating system draws the title bar. Close the window to exit.
+
+### Screenshots
+
+These images are intentional placeholders, not captures of the current application. Replace them with real screenshots when available.
+
+![Text chat screenshot placeholder](docs/screenshots/text-chat-placeholder.svg)
+
+*Text chat — streaming reply placeholder.*
+
+![Voice chat screenshot placeholder](docs/screenshots/voice-chat-placeholder.svg)
+
+*Voice chat — listening and spoken response placeholder.*
 
 ### Profile and local assets
 
-After dependency and model setup succeeds, the installer calls `src/create_user_profile.py` as a separate interactive step when no personal profile exists. The profile covers optional identity, interests, goals, learning preferences, and response preferences. Saving or replacing requires explicit confirmation. The personal profile lives in Git-ignored `config/local/user_profile.json`; additional named profiles can be created with `python src/create_user_profile.py --id study` and are saved under `config/local/profiles/`. Select the active profile in the GUI's profile page or the CLI Settings menu. A fictional, read-only Demo profile is included at `config/examples/profiles/demo.json`; it is only used when explicitly selected. `PromptManager` inserts profile data through `{user_profile}` and formats behavior settings through `{behavior_instructions}`; neither feature rewrites `prompts/system_prompt.txt`. Behavior overrides live in `config/local/behavior.local.json`. Personal/named profile data, behavior overrides, speech-cache files, and settings stay local and are not committed; the bundled Demo preset is tracked. Project prompts, personas, and other tracked files come from the clone. The installers do not copy the repository tree or process Git-ignored paths. Kokoro assets go under Git-ignored `models/kokoro/`; partial downloads are ignored too. Large/generated model files and local user configuration are not included in Git. Review upstream model and voice terms before redistribution.
+The installer opens `src/create_user_profile.py` when no personal profile exists. Saving or replacing a profile requires explicit confirmation.
+
+- Personal profile: `config/local/user_profile.json` (ignored by Git).
+- Additional named profiles: `config/local/profiles/`; create one with `python src/create_user_profile.py --id study`.
+- Bundled Demo profile: `config/examples/profiles/demo.json`; fictional, read-only, and used only when selected.
+- Profile context and behavior preferences enter the prompt through `{user_profile}` and `{behavior_instructions}`. Neither rewrites `prompts/system_prompt.txt`.
+- Personal and named profiles, behavior overrides, cached audio, and settings remain local. Project prompts, personas, and other tracked files come from the clone.
+- Kokoro model assets are stored under `models/kokoro/` and are not committed. Review upstream model and voice terms before redistribution.
 
 The terminal menu offers:
 
 - `1` — Text Chat
 - `2` — Voice Chat
+- `3` — Settings & Selectors (persona, Kokoro voice and speed, and profile context)
 - `0` — Exit
 
-The Settings menu can also select which profile context is used by the next chat session. Create or edit local profiles from the repository root with:
+Create or edit local profiles from the repository root with:
 
 ```bat
 python src\create_user_profile.py
@@ -214,6 +252,7 @@ RIKO-Major-Project/
 ## Known Limitations
 
 - RIKO is under active development; behaviour and interfaces may change.
+- The current desktop GUI uses Tkinter; GTK4 is not implemented.
 - Transcription quality and latency depend on the STT model, microphone, CPU performance, and environment.
 - Initial model downloads and initialization may take time.
 - Voice interaction depends on correctly installed audio dependencies and local model assets.
