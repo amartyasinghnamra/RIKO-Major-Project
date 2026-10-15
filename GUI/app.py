@@ -52,6 +52,8 @@ COLORS = {
     "quiet": "#747582",
     "accent": "#c4a8ff",
     "accent_dark": "#34294a",
+    "assistant_bubble": "#202b29",
+    "assistant_accent": "#91d4b7",
     "user_bubble": "#272433",
     "success": "#8cc7a2",
     "warning": "#e5b879",
@@ -353,6 +355,7 @@ class RikoDesktop:
         self.voice_values: list[str] = []
         self.reply_action_widgets = {}
         self.reply_contexts = {}
+        self.reply_bubbles = {}
         self.latest_text_reply_body = None
         self.read_aloud_tts = None
         self.read_aloud_active = False
@@ -1169,22 +1172,27 @@ class RikoDesktop:
     ) -> MarkdownResponse | tk.Label:
         is_user = role == "you"
         row = tk.Frame(self.message_frame, bg=COLORS["background"])
-        row.pack(fill="x", padx=42, pady=(11, 3))
-        bubble_color = COLORS["user_bubble"] if is_user else COLORS["panel"]
+        row.pack(fill="x", padx=32, pady=(12, 4))
+        bubble_color = (
+            COLORS["user_bubble"] if is_user else COLORS["assistant_bubble"]
+        )
         bubble = RoundedFrame(
             row,
             background=COLORS["background"],
             fill=bubble_color,
-            radius=14,
+            radius=16,
             outline=COLORS["border"],
             border_width=1,
         )
-        bubble.pack(side="right" if is_user else "left", padx=(110, 0) if is_user else (0, 110))
+        if is_user:
+            bubble.pack(side="left", padx=(0, 120))
+        else:
+            bubble.pack(side="right", fill="x", expand=True, padx=(56, 0))
         tk.Label(
             bubble,
             text="YOU" if is_user else self._persona_name().upper(),
             bg=bubble_color,
-            fg=COLORS["accent"] if not is_user else COLORS["muted"],
+            fg=COLORS["muted"] if is_user else COLORS["assistant_accent"],
             font=(UI_FONT_FAMILY, 8, "bold"),
             anchor="w",
         ).pack(fill="x", padx=4, pady=(10, 3))
@@ -1197,18 +1205,24 @@ class RikoDesktop:
                 font=(UI_FONT_FAMILY, 10),
                 justify="left",
                 anchor="w",
-                wraplength=max(330, self.workspace.winfo_width() - 420),
+                wraplength=max(
+                    260,
+                    min(560, round(self.workspace.winfo_width() * 0.58)),
+                ),
                 padx=14,
             )
         else:
-            wrap_pixels = max(330, self.workspace.winfo_width() - 420)
+            wrap_pixels = max(300, self.workspace.winfo_width() - 180)
             body = MarkdownResponse(
                 bubble,
-                width=max(42, min(100, wrap_pixels // 8)),
+                width=max(42, min(120, wrap_pixels // 8)),
                 background=bubble_color,
             )
             body.set_markdown(text or " ")
         body.pack(fill="x", padx=4, pady=(0, 11))
+        if not hasattr(self, "reply_bubbles"):
+            self.reply_bubbles = {}
+        self.reply_bubbles[body] = bubble
         if not is_user and with_actions:
             actions = tk.Frame(bubble, bg=bubble_color)
             actions.pack(fill="x", padx=14, pady=(0, 10))
@@ -1254,6 +1268,103 @@ class RikoDesktop:
             render_markdown(text or " ")
         else:
             self.active_reply_label.configure(text=text or " ")
+
+    def _add_tool_call(self, payload) -> None:
+        body = self.active_reply_label
+        bubble = getattr(self, "reply_bubbles", {}).get(body)
+        if body is None or bubble is None or not isinstance(payload, dict):
+            return
+
+        tool_name = str(payload.get("tool_name", "unknown_tool"))
+        display_name = {
+            "get_architecture_info": "architecture_lookup",
+            "explore_codebase": "codebase_lookup",
+        }.get(tool_name, tool_name)
+        arguments = payload.get("arguments", {})
+        if isinstance(arguments, str):
+            try:
+                arguments = json.loads(arguments)
+            except json.JSONDecodeError:
+                arguments = {"query": arguments}
+        if not isinstance(arguments, dict):
+            arguments = {}
+        query = (
+            arguments.get("topic")
+            or arguments.get("path")
+            or arguments.get("query")
+            or arguments.get("operation")
+            or ""
+        )
+        paths = payload.get("result_paths", [])
+        if not isinstance(paths, list):
+            paths = []
+
+        block = tk.Frame(bubble, bg=COLORS["panel_lighter"])
+        block.pack(fill="x", padx=12, pady=(7, 0), before=body)
+        details = tk.Frame(block, bg=COLORS["panel_lighter"])
+        expanded = {"value": False}
+
+        def toggle_details() -> None:
+            expanded["value"] = not expanded["value"]
+            if expanded["value"]:
+                details.pack(fill="x", padx=11, pady=(0, 10))
+                toggle.configure(text=f"▾  tool  {display_name}")
+            else:
+                details.pack_forget()
+                toggle.configure(text=f"▸  tool  {display_name}")
+
+        toggle = self._button(
+            block,
+            f"▸  tool  {display_name}",
+            toggle_details,
+            bg=COLORS["panel_lighter"],
+            fg=COLORS["assistant_accent"],
+            activebackground=COLORS["panel"],
+            anchor="w",
+            padx=10,
+            pady=7,
+            font=(UI_FONT_FAMILY, 9, "bold"),
+        )
+        toggle.pack(fill="x", padx=3, pady=3)
+
+        tk.Label(
+            details,
+            text=f"Query / pattern: {query or '(not provided)'}",
+            bg=COLORS["panel_lighter"],
+            fg=COLORS["text"],
+            font=(UI_FONT_FAMILY, 9),
+            justify="left",
+            anchor="w",
+            wraplength=max(280, self.workspace.winfo_width() - 180),
+        ).pack(fill="x", pady=(0, 5))
+        tk.Label(
+            details,
+            text="Files returned",
+            bg=COLORS["panel_lighter"],
+            fg=COLORS["muted"],
+            font=(UI_FONT_FAMILY, 8, "bold"),
+            anchor="w",
+        ).pack(fill="x", pady=(0, 2))
+        for path in paths:
+            tk.Label(
+                details,
+                text=f"→ {path}",
+                bg=COLORS["panel_lighter"],
+                fg=COLORS["text"],
+                font=(CODE_FONT_FAMILY, 8),
+                anchor="w",
+                justify="left",
+                wraplength=max(280, self.workspace.winfo_width() - 180),
+            ).pack(fill="x")
+        if not paths:
+            tk.Label(
+                details,
+                text="No file paths returned.",
+                bg=COLORS["panel_lighter"],
+                fg=COLORS["quiet"],
+                font=(UI_FONT_FAMILY, 8),
+                anchor="w",
+            ).pack(fill="x")
 
     def _refresh_reply_action_buttons(self) -> None:
         if not hasattr(self, "reply_action_widgets"):
@@ -1731,6 +1842,12 @@ class RikoDesktop:
                     and item[0] == "__RIKO_STATUS__"
                 ):
                     self.events.put(("status", str(item[1])))
+                elif (
+                    isinstance(item, tuple)
+                    and len(item) == 2
+                    and item[0] == "__RIKO_TOOL__"
+                ):
+                    self.events.put(("tool_call", item[1]))
                 elif isinstance(item, str):
                     self.events.put(("token", item))
                 yield item
@@ -1892,6 +2009,8 @@ class RikoDesktop:
     def _handle_voice_pipeline_event(self, event: str, payload) -> None:
         if event == "transcript":
             self.handle_voice_transcription(str(payload))
+        elif event == "tool_call":
+            self._add_tool_call(payload)
         elif event == "response_started":
             self.busy = True
             self.response_cancel_requested = False
@@ -1982,6 +2101,8 @@ class RikoDesktop:
                 self._set_reply_content(self.current_reply or "…")
             elif event == "status":
                 self.status_var.set(str(payload))
+            elif event == "tool_call":
+                self._add_tool_call(payload)
             elif event == "done":
                 was_cancelled = self.response_cancel_requested
                 self.busy = False

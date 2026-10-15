@@ -416,6 +416,122 @@ def test_message_bubble_uses_pack_padding_instead_of_invalid_label_option(monkey
     assert body.pack_options["pady"] == (0, 11)
 
 
+def test_assistant_bubble_is_right_aligned_and_uses_available_width(monkeypatch):
+    rounded_frames = []
+
+    class FakeWidget:
+        def __init__(self, _parent=None, **kwargs):
+            self.options = kwargs
+            self.pack_options = None
+
+        def pack(self, **kwargs):
+            self.pack_options = kwargs
+
+    class FakeRoundedFrame(FakeWidget):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            rounded_frames.append(self)
+
+    class FakeMarkdownResponse(FakeWidget):
+        def set_markdown(self, _text):
+            pass
+
+    monkeypatch.setattr(gui_app.tk, "Frame", FakeWidget)
+    monkeypatch.setattr(gui_app.tk, "Label", FakeWidget)
+    monkeypatch.setattr(gui_app, "RoundedFrame", FakeRoundedFrame)
+    monkeypatch.setattr(gui_app, "MarkdownResponse", FakeMarkdownResponse)
+    desktop = gui_app.RikoDesktop.__new__(gui_app.RikoDesktop)
+    desktop.message_frame = FakeWidget()
+    desktop.workspace = type("Workspace", (), {"winfo_width": lambda _self: 1000})()
+    desktop._persona_name = lambda: "Riko"
+
+    desktop._add_message("riko", "A wider response")
+
+    bubble = rounded_frames[-1]
+    assert bubble.pack_options["side"] == "right"
+    assert bubble.pack_options["fill"] == "x"
+    assert bubble.pack_options["expand"] is True
+    assert bubble.pack_options["padx"] == (56, 0)
+
+
+def test_tool_call_block_starts_collapsed_and_expands_on_click(monkeypatch):
+    frames = []
+    buttons = []
+
+    class FakeWidget:
+        def __init__(self, parent=None, **kwargs):
+            self.parent = parent
+            self.options = kwargs
+            self.pack_options = None
+            self.children = []
+            if parent is not None and hasattr(parent, "children"):
+                parent.children.append(self)
+
+        def pack(self, **kwargs):
+            self.pack_options = kwargs
+
+        def pack_forget(self):
+            self.pack_options = None
+
+        def configure(self, **kwargs):
+            self.options.update(kwargs)
+
+    class FakeFrame(FakeWidget):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            frames.append(self)
+
+    class FakeButton(FakeWidget):
+        def __init__(self, parent, text, command, **kwargs):
+            super().__init__(parent, text=text, **kwargs)
+            self.command = command
+            buttons.append(self)
+
+    monkeypatch.setattr(gui_app.tk, "Frame", FakeFrame)
+    monkeypatch.setattr(gui_app.tk, "Label", FakeWidget)
+    desktop = gui_app.RikoDesktop.__new__(gui_app.RikoDesktop)
+    reply = object()
+    bubble = FakeWidget()
+    desktop.active_reply_label = reply
+    desktop.reply_bubbles = {reply: bubble}
+    desktop.workspace = type("Workspace", (), {"winfo_width": lambda _self: 900})()
+    desktop._button = lambda parent, text, command, **kwargs: FakeButton(
+        parent,
+        text,
+        command,
+        **kwargs,
+    )
+
+    desktop._add_tool_call({
+        "tool_name": "get_architecture_info",
+        "arguments": {"topic": "modules"},
+        "result_paths": ["knowledge/architecture/modules.md"],
+    })
+
+    block, details = frames
+    toggle = buttons[0]
+    assert details.pack_options is None
+    assert toggle.options["text"] == "▸  tool  architecture_lookup"
+    toggle.command()
+    assert details.pack_options is not None
+    assert toggle.options["text"] == "▾  tool  architecture_lookup"
+
+
+def test_text_and_voice_tool_events_both_reach_gui_renderer():
+    payload = {"tool_name": "explore_codebase", "result_paths": ["src/main.py"]}
+    received = []
+    desktop = gui_app.RikoDesktop.__new__(gui_app.RikoDesktop)
+    desktop.events = queue.Queue()
+    desktop.events.put(("tool_call", payload))
+    desktop._add_tool_call = lambda event: received.append(event)
+    desktop.root = type("Root", (), {"after": lambda *_args: None})()
+
+    desktop._drain_events()
+    desktop._handle_voice_pipeline_event("tool_call", payload)
+
+    assert received == [payload, payload]
+
+
 def test_send_button_becomes_stop_and_cancels_text_generation():
     class Conversation:
         stopped = False
