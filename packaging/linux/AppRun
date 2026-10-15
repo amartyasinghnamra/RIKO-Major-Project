@@ -13,6 +13,38 @@ fi
 mkdir -p "$APP_HOME"
 cp -a "$BUNDLE_DIR/." "$APP_HOME/"
 
+if [[ -n "${APPIMAGE:-}" && -f "$APPIMAGE" ]]; then
+    APPIMAGE_LAUNCHER="$APP_HOME/RIKO.AppImage"
+    if [[ "$APPIMAGE" != "$APPIMAGE_LAUNCHER" ]]; then
+        cp -- "$APPIMAGE" "$APPIMAGE_LAUNCHER"
+    fi
+    chmod u+x "$APPIMAGE_LAUNCHER"
+
+    ICON_FILE="$APP_HOME/riko.png"
+    if [[ -f "$APP_DIR/riko.png" ]]; then
+        cp -- "$APP_DIR/riko.png" "$ICON_FILE"
+    fi
+
+    DESKTOP_DIR=""
+    if command -v xdg-user-dir >/dev/null 2>&1; then
+        DESKTOP_DIR="$(xdg-user-dir DESKTOP 2>/dev/null || true)"
+    fi
+    [[ -n "$DESKTOP_DIR" ]] || DESKTOP_DIR="$HOME/Desktop"
+    APP_ENTRY_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+    mkdir -p "$DESKTOP_DIR" "$APP_ENTRY_DIR"
+
+    escaped_launcher="${APPIMAGE_LAUNCHER//\\/\\\\}"
+    escaped_launcher="${escaped_launcher//\"/\\\"}"
+    for launcher_file in "$DESKTOP_DIR/RIKO.desktop" "$APP_ENTRY_DIR/riko.desktop"; do
+        printf '[Desktop Entry]\nType=Application\nName=RIKO\nComment=Local-first AI companion\nExec="%s"\nIcon=%s\nCategories=Utility;\nTerminal=false\n' \
+            "$escaped_launcher" "$ICON_FILE" > "$launcher_file"
+        chmod u+x "$launcher_file"
+        if command -v gio >/dev/null 2>&1; then
+            gio set "$launcher_file" metadata::trusted true 2>/dev/null || true
+        fi
+    done
+fi
+
 if [[ ! -f "$APP_HOME/.riko-setup-complete" ]]; then
     SETUP_SCRIPT="$APP_HOME/riko-setup-and-run.sh"
     if [[ -t 0 && -t 1 ]]; then

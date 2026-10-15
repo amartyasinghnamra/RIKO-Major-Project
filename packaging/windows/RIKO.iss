@@ -26,7 +26,8 @@ Uninstallable=yes
 Source: "{#AppSource}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\RIKO"; Filename: "{sys}\cmd.exe"; Parameters: "/D /C ""{app}\run-gui.bat"""; WorkingDir: "{app}"
+Name: "{autoprograms}\RIKO"; Filename: "{app}\.venv-tts\Scripts\pythonw.exe"; Parameters: """{app}\GUI\app.py"""; WorkingDir: "{app}"
+Name: "{autodesktop}\RIKO"; Filename: "{app}\.venv-tts\Scripts\pythonw.exe"; Parameters: """{app}\GUI\app.py"""; WorkingDir: "{app}"
 Name: "{autoprograms}\RIKO CLI"; Filename: "{sys}\cmd.exe"; Parameters: "/D /K ""{app}\run.bat"""; WorkingDir: "{app}"
 
 [Run]

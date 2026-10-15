@@ -208,9 +208,9 @@ The Linux installer uses `sudo` (or root) with `apt-get` and configures **Debian
 
 ### Downloadable packages
 
-The `Build desktop packages` GitHub Actions workflow creates a Windows `RIKO-Setup.exe` installer and an x86_64 Linux AppImage. Download generated artifacts from a completed workflow run; release assets are not published automatically.
+The `Build desktop packages` GitHub Actions workflow creates a Windows `RIKO-Setup.exe` installer and an x86_64 Linux AppImage. Push a `v*` tag to build both packages and automatically publish a GitHub Release with the installers attached. Builds triggered by pushes to `main` or manual workflow runs are available as Actions artifacts for 14 days.
 
-Both packages download Python dependencies and model assets during setup rather than bundling them. Windows installs RIKO per user and runs the existing setup script. On first launch, the AppImage copies the application files to `${XDG_DATA_HOME:-~/.local/share}/RIKO`, then opens a terminal for setup. Linux setup installs system prerequisites with `apt-get` and may request `sudo`; automatic setup supports Debian/Ubuntu. Internet access is required. The AppImage is an installer/launcher, not a fully self-contained offline runtime.
+Both packages download Python dependencies and model assets during setup rather than bundling them. Windows installs RIKO per user and runs the existing setup script. Its Desktop and Start Menu shortcuts launch the GUI directly without opening a console. The AppImage copies RIKO to `${XDG_DATA_HOME:-~/.local/share}/RIKO` and creates Desktop and application-menu launchers for future GUI-only launches. Its first launch opens a terminal for setup. Linux setup installs system prerequisites with `apt-get` and may request `sudo`; automatic setup supports Debian/Ubuntu. Internet access is required. The AppImage is an installer/launcher, not a fully self-contained offline runtime.
 
 ### What happens during installation
 

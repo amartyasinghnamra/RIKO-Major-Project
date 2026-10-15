@@ -30,7 +30,8 @@ jobs:
           APP_OUTPUT: ${{ github.workspace }}\build\output
         run: |
           New-Item -ItemType Directory -Force build/output | Out-Null
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$env:APP_VERSION" "/DAppSource=$env:APP_SOURCE" "/O$env:APP_OUTPUT" packaging/windows/RIKO.iss
+          $version = $env:APP_VERSION -replace '^v', ''
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$version" "/DAppSource=$env:APP_SOURCE" "/O$env:APP_OUTPUT" packaging/windows/RIKO.iss
       - uses: actions/upload-artifact@v4
         with:
           name: riko-windows-installer
@@ -54,3 +55,26 @@ jobs:
           path: build/output/RIKO-x86_64.AppImage
           if-no-files-found: error
           retention-days: 14
+
+  github-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows-installer, linux-appimage]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: riko-*
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: RIKO ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            dist/RIKO-Setup.exe
+            dist/RIKO-x86_64.AppImage
