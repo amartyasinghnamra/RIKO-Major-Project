@@ -15,6 +15,7 @@ Prompt files:
 
 Profile selection and data:
 - SettingsManager stores the active profile ID in config/local/config.json; it defaults to "user" for existing installations.
+- The "text_to_voice_enabled" setting defaults to true and controls whether text-mode assistant replies expose a manual Kokoro Read aloud action. Speech is not automatic.
 - The private personal profile is config/local/user_profile.json. Additional named local profiles live in config/local/profiles/.
 - The fictional bundled Demo profile is config/examples/profiles/demo.json. It is read-only and only enters the prompt when selected.
 - PromptManager resolves the selected profile, normalizes supported fields with src/user_profile.py, then supplies the profile JSON through the existing {user_profile} template placeholder.

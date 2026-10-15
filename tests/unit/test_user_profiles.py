@@ -183,3 +183,23 @@ def test_settings_profile_updates_preserve_other_values(tmp_path):
     assert loaded["persona"] == "tutor"
     assert loaded["tts"]["speed"] == 1.25
     assert loaded["profile"] == "demo"
+
+
+def test_text_to_voice_setting_defaults_on_and_persists_without_losing_preferences(tmp_path):
+    settings = SettingsManager(tmp_path)
+    assert settings.get_text_to_voice_enabled() is True
+
+    settings.set_persona("tutor")
+    settings.set_text_to_voice_enabled(False)
+
+    loaded = settings.load()
+    assert settings.get_text_to_voice_enabled() is False
+    assert loaded["persona"] == "tutor"
+    assert loaded["tts"]["voice"] == "af_sarah"
+
+
+def test_text_to_voice_setting_requires_a_boolean(tmp_path):
+    settings = SettingsManager(tmp_path)
+
+    with pytest.raises(TypeError, match="boolean"):
+        settings.set_text_to_voice_enabled("no")

@@ -14,6 +14,7 @@ from typing import Any
 DEFAULT_SETTINGS = {
     "persona": "assistant",
     "profile": "user",
+    "text_to_voice_enabled": True,
     "tts": {
         "engine": "kokoro",
         "voice": "af_sarah",
@@ -121,6 +122,17 @@ class SettingsManager:
         profile_id = self._validate_identifier(profile_id, "profile")
         settings = self.load()
         settings["profile"] = profile_id
+        self.save(settings)
+
+    def get_text_to_voice_enabled(self) -> bool:
+        value = self.load().get("text_to_voice_enabled", True)
+        return value if isinstance(value, bool) else True
+
+    def set_text_to_voice_enabled(self, enabled: bool) -> None:
+        if not isinstance(enabled, bool):
+            raise TypeError("text_to_voice_enabled must be a boolean")
+        settings = self.load()
+        settings["text_to_voice_enabled"] = enabled
         self.save(settings)
 
     def get_tts_settings(self) -> dict[str, Any]:

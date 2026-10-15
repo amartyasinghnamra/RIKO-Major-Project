@@ -229,3 +229,16 @@ def test_cancelled_stream_does_not_play_queued_audio():
         pass
 
     assert tts._playback.played == []
+
+
+def test_speak_text_skips_synthesis_if_cancellation_was_requested():
+    tts = KokoroTTS.__new__(KokoroTTS)
+    tts._operation_lock = threading.Lock()
+    tts._playback = type("Playback", (), {"play_samples": lambda *_args: None})()
+    tts.synthesize = lambda _text: (_ for _ in ()).throw(
+        AssertionError("cancelled speech should not be synthesized")
+    )
+    cancel_event = threading.Event()
+    cancel_event.set()
+
+    tts.speak_text("Cancelled before playback", cancel_event=cancel_event)

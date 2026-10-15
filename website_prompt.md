@@ -8,6 +8,7 @@ Update the existing RIKO website. Do not rebuild it or change content that has a
 - The native desktop app is built with Python and Tkinter. It calls RIKO's shared text and voice backend directly; it is not a browser wrapper.
 - The app runs on Windows and Linux. Its cards, composer, and chat surfaces use Tkinter Canvas drawing for cross-platform rounded corners. Keep the OS-native title bar.
 - The desktop app has text and hands-free voice modes, Markdown-formatted model replies, a stop control, local profiles, and zoom from 80% to 160%. Zoom works with the visible −/+ controls, Ctrl/Command keyboard shortcuts, and Ctrl/Command plus mouse wheel.
+- In text mode, assistant replies provide Regenerate and Read aloud actions. Preferences can enable or disable text-to-voice; speech is user-triggered and not automatic. A microphone control starts/stops local Faster-Whisper transcription and places live drafts and the final transcript in the composer for review.
 - In voice mode, Kokoro receives cleaned text so Markdown markers such as `**` are not read aloud.
 - Do not claim unfinished work is complete. GTK4 remains a roadmap item; the current GUI is Tkinter. Growth mode and voice barge-in tuning remain in progress.
 

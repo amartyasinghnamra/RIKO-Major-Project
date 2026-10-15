@@ -5,6 +5,7 @@ from __future__ import annotations
 import queue
 import threading
 from time import monotonic
+from typing import Callable
 
 import numpy as np
 
@@ -64,11 +65,21 @@ class StreamingVoiceInput:
 
         log_event("STT", "Transcription engine initialized")
 
-    def listen_once(self, stop_event: threading.Event | None = None) -> str:
+    def listen_once(
+        self,
+        stop_event: threading.Event | None = None,
+        *,
+        on_partial: Callable[[str], None] | None = None,
+        finalize_on_stop: bool = False,
+        manual_stop: bool = False,
+    ) -> str:
         """Capture one utterance, display draft transcripts, and finalize it.
 
         ``stop_event`` lets a host UI end an active listening session without
         replacing this pipeline's silence detection or transcription logic.
+        ``manual_stop`` keeps capture open until that event is set, and
+        ``finalize_on_stop`` transcribes the captured audio after a user stop.
+        Partial results are sent to ``on_partial`` when provided.
         """
 
         listen_started = monotonic()
@@ -131,10 +142,13 @@ class StreamingVoiceInput:
                         with partial_lock:
                             if text != latest_partial:
                                 latest_partial = text
-                                print(
-                                    f"\r[RIKO live draft] {text}     ",
-                                    flush=True,
-                                )
+                                if on_partial is not None:
+                                    on_partial(text)
+                                else:
+                                    print(
+                                        f"\r[RIKO live draft] {text}     ",
+                                        flush=True,
+                                    )
 
                 except Exception as exc:
                     log_exception("STT", "Partial transcription failed", exc)
@@ -194,7 +208,11 @@ class StreamingVoiceInput:
                     now = monotonic()
                     elapsed = now - started
 
-                    if not speech_started and elapsed >= self.speech_timeout:
+                    if (
+                        not manual_stop
+                        and not speech_started
+                        and elapsed >= self.speech_timeout
+                    ):
                         log_event(
                             "STT",
                             "Speech timeout",
@@ -251,10 +269,10 @@ class StreamingVoiceInput:
                         )
 
                         if duration >= 1.5:
-                            #schedule_partial()
+                            schedule_partial()
                             last_update = now
 
-                    if finished:
+                    if finished and not manual_stop:
                         log_event(
                             "STT",
                             "Speech boundary detected",
@@ -299,7 +317,10 @@ class StreamingVoiceInput:
                 ),
             )
 
-        if cancelled or (stop_event is not None and stop_event.is_set()):
+        if (
+            (cancelled or (stop_event is not None and stop_event.is_set()))
+            and not finalize_on_stop
+        ):
             log_event("STT", "Listening session stopped by host")
             return ""
 

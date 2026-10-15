@@ -14,6 +14,13 @@ def test_zoom_targets_are_clamped_and_have_normal_steps():
     assert gui_app._clamp_zoom(2.0) == 1.6
 
 
+def test_rolling_transcript_drafts_merge_their_overlapping_words():
+    assert gui_app._merge_transcript_draft(
+        "Turn on the lights in my",
+        "on the lights in my room.",
+    ) == "Turn on the lights in my room."
+
+
 def test_zoom_shortcuts_cover_keyboard_and_mousewheel():
     class Root:
         bindings = {}
@@ -105,6 +112,12 @@ class TextInput(Control):
 
     def delete(self, *_args):
         self.value = ""
+
+    def insert(self, _index, value):
+        self.value = value
+
+    def mark_set(self, *_args):
+        pass
 
 
 def test_text_send_routes_the_composed_message_to_text_mode():
@@ -475,12 +488,16 @@ def test_preferences_can_be_saved_during_generation():
         def __init__(self):
             self.voice = None
             self.speed = None
+            self.text_to_voice = None
 
         def set_tts_voice(self, voice, _available):
             self.voice = voice
 
         def set_tts_speed(self, speed):
             self.speed = speed
+
+        def set_text_to_voice_enabled(self, enabled):
+            self.text_to_voice = enabled
 
     prompts = Prompts()
     settings = Settings()
@@ -492,6 +509,7 @@ def test_preferences_can_be_saved_during_generation():
     desktop.persona_choice = Value("tutor")
     desktop.voice_var = Value("af_heart")
     desktop.speed_var = Value(1.25)
+    desktop.text_to_voice_var = Value(True)
     desktop.voice_values = ["af_heart"]
     desktop.settings_window = None
     desktop.events = queue.Queue()
@@ -501,4 +519,229 @@ def test_preferences_can_be_saved_during_generation():
     assert prompts.selected == "tutor"
     assert settings.voice == "af_heart"
     assert settings.speed == 1.25
+    assert settings.text_to_voice is True
     assert desktop.events.get_nowait() == ("settings_saved", None)
+
+
+def test_microphone_button_toggles_manual_transcription(monkeypatch):
+    threads = []
+
+    class FakeThread:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+            threads.append(self)
+
+        def start(self):
+            self.started = True
+
+    monkeypatch.setattr(gui_app.threading, "Thread", FakeThread)
+    desktop = gui_app.RikoDesktop.__new__(gui_app.RikoDesktop)
+    desktop.mode_var = Value("text")
+    desktop.busy = False
+    desktop.voice_session_active = False
+    desktop.mic_recording = False
+    desktop.mic_stop_requested = False
+    desktop.mic_stop_event = None
+    desktop.mic_original_text = "Existing draft"
+    desktop.mic_thread = None
+    desktop.read_aloud_active = False
+    desktop.input = TextInput("Existing draft")
+    desktop.mode_buttons = {"text": Control(), "voice": Control()}
+    desktop.send_button = Control()
+    desktop.mic_button = Control()
+    desktop.reply_action_widgets = {}
+    desktop.reply_contexts = {}
+    desktop.status_var = Value("")
+
+    desktop.toggle_mic_recording()
+
+    assert desktop.mic_recording is True
+    assert desktop.input.config["state"] == "disabled"
+    assert desktop.mic_button.config["text"] == "■"
+    assert threads[0].started is True
+    stop_event = threads[0].kwargs["args"][0]
+    assert not stop_event.is_set()
+
+    desktop.toggle_mic_recording()
+
+    assert stop_event.is_set()
+    assert desktop.mic_stop_requested is True
+    assert desktop.mic_button.config["state"] == "disabled"
+
+
+def test_manual_microphone_transcription_uses_shared_streaming_stt(monkeypatch):
+    from audio.stt import streaming_voice_input
+
+    observed = {}
+
+    class FakeStreamingVoiceInput:
+        def __init__(self, **kwargs):
+            observed["init"] = kwargs
+
+        def listen_once(self, **kwargs):
+            observed["listen"] = kwargs
+            kwargs["on_partial"]("draft words")
+            return "final words"
+
+    monkeypatch.setattr(
+        streaming_voice_input,
+        "StreamingVoiceInput",
+        FakeStreamingVoiceInput,
+    )
+    desktop = gui_app.RikoDesktop.__new__(gui_app.RikoDesktop)
+    desktop.events = queue.Queue()
+    stop_event = __import__("threading").Event()
+
+    desktop._run_mic_recording(stop_event)
+
+    assert observed["listen"]["stop_event"] is stop_event
+    assert observed["listen"]["manual_stop"] is True
+    assert observed["listen"]["finalize_on_stop"] is True
+    assert desktop.events.get_nowait() == ("mic_partial", "draft words")
+    assert desktop.events.get_nowait() == ("mic_recording_done", ("final words", None))
+
+
+def test_mic_partial_and_final_transcript_update_composer_preserving_draft():
+    desktop = gui_app.RikoDesktop.__new__(gui_app.RikoDesktop)
+    desktop.mic_recording = True
+    desktop.mic_stop_requested = False
+    desktop.mic_original_text = "Please ask:"
+    desktop.mic_partial_text = ""
+    desktop.input = TextInput("Please ask:")
+    desktop.mode_buttons = {"text": Control(), "voice": Control()}
+    desktop.send_button = Control()
+    desktop.mic_button = Control()
+    desktop.reply_action_widgets = {}
+    desktop.reply_contexts = {}
+    desktop.busy = False
+    desktop.voice_session_active = False
+    desktop.mode_var = Value("text")
+    desktop.status_var = Value("")
+
+    desktop._apply_mic_partial("draft question")
+    assert desktop.input.value == "Please ask:\ndraft question"
+    assert desktop.input.config["state"] == "disabled"
+
+    desktop._finish_mic_recording(("final question", None))
+    assert desktop.input.value == "Please ask:\nfinal question"
+    assert desktop.input.config["state"] == "normal"
+    assert "Review it" in desktop.status_var.get()
+
+
+def test_regenerate_reuses_latest_turn_without_adding_another_user_message(monkeypatch):
+    created_threads = []
+
+    class FakeThread:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+            created_threads.append(self)
+
+        def start(self):
+            self.started = True
+
+    class Conversation:
+        def __init__(self):
+            self.messages = [
+                {"role": "system", "content": "old prompt"},
+                {"role": "user", "content": "earlier turn"},
+                {"role": "assistant", "content": "earlier reply"},
+                {"role": "user", "content": "current question"},
+                {"role": "assistant", "content": "old answer"},
+            ]
+
+        def begin_response(self):
+            pass
+
+    class Prompts:
+        def build_prompt(self, mode="text"):
+            return f"fresh {mode} prompt"
+
+    monkeypatch.setattr(gui_app.threading, "Thread", FakeThread)
+    body = Control()
+    conversation = Conversation()
+    history = [dict(item) for item in conversation.messages[:3]]
+    desktop = gui_app.RikoDesktop.__new__(gui_app.RikoDesktop)
+    desktop.reply_contexts = {
+        body: {
+            "message": "current question",
+            "conversation": conversation,
+            "history": history,
+            "text": "old answer",
+        }
+    }
+    desktop.latest_text_reply_body = body
+    desktop.active_reply_label = body
+    desktop.current_reply = "old answer"
+    desktop.busy = False
+    desktop.voice_session_active = False
+    desktop.mic_recording = False
+    desktop.read_aloud_active = False
+    desktop.read_aloud_button = None
+    desktop.response_cancel_requested = False
+    desktop.prompts = Prompts()
+    desktop.mode_var = Value("text")
+    desktop.send_button = Control()
+    desktop.mic_button = Control()
+    desktop.mic_recording = False
+    desktop.mic_stop_requested = False
+    desktop.voice_stopping = False
+    desktop.status_var = Value("")
+    desktop.mode_buttons = {"text": Control(), "voice": Control()}
+    desktop.reply_action_widgets = {}
+
+    desktop.regenerate_reply(body)
+
+    assert conversation.messages == [
+        {"role": "system", "content": "fresh text prompt"},
+        {"role": "user", "content": "earlier turn"},
+        {"role": "assistant", "content": "earlier reply"},
+    ]
+    assert created_threads[0].kwargs["args"] == ("current question", conversation)
+    assert desktop.busy is True
+
+
+def test_read_aloud_uses_markdown_cleaned_text_and_can_be_cancelled(monkeypatch):
+    created_threads = []
+
+    class FakeThread:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+            created_threads.append(self)
+
+        def start(self):
+            self.started = True
+
+    class Settings:
+        def get_text_to_voice_enabled(self):
+            return True
+
+    monkeypatch.setattr(gui_app.threading, "Thread", FakeThread)
+    body = object()
+    read_button = Control()
+    desktop = gui_app.RikoDesktop.__new__(gui_app.RikoDesktop)
+    desktop.reply_contexts = {body: {"text": "**Hello there.**"}}
+    desktop.reply_action_widgets = {body: {"read_aloud": read_button, "regenerate": Control()}}
+    desktop.settings = Settings()
+    desktop.read_aloud_active = False
+    desktop.read_aloud_stop_event = None
+    desktop.read_aloud_button = None
+    desktop.read_aloud_lock = __import__("threading").Lock()
+    desktop.read_aloud_tts = None
+    desktop.busy = False
+    desktop.mic_recording = False
+    desktop.voice_session_active = False
+    desktop.latest_text_reply_body = body
+    desktop.status_var = Value("")
+    desktop.events = queue.Queue()
+
+    desktop.toggle_read_aloud(body)
+
+    assert desktop.read_aloud_active is True
+    assert created_threads[0].kwargs["args"][0] == "Hello there."
+    assert read_button.config["text"] == "■  Stop audio"
+    stop_event = created_threads[0].kwargs["args"][1]
+
+    desktop.toggle_read_aloud(body)
+
+    assert stop_event.is_set()
+    assert desktop.status_var.get() == "Stopping read-aloud playback…"

@@ -165,7 +165,10 @@ def test_gui_imports_and_starts_the_shared_cli_sessions():
     assert "run_voice_chat" in source
     assert "TextChatSession" not in source
     assert "VoiceChatSession" not in source
-    assert "StreamingVoiceInput" not in source
+    assert "StreamingVoiceInput" not in source.split("def _run_mic_recording", 1)[0]
+    assert "StreamingVoiceInput" in inspect.getsource(
+        gui_app.RikoDesktop._run_mic_recording
+    )
     assert "FasterWhisperSTT" not in source
     assert "MicrophoneCapture" not in source
 

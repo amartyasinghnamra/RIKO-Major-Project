@@ -9,6 +9,8 @@ Recently tested:
 - Configurable prompts/persona inputs.
 - Timestamped diagnostic logging.
 - Native Tkinter desktop interface routed through the shared text and voice session functions.
+- Text-mode Regenerate and optional Kokoro Read aloud actions; assistant Markdown is cleaned before synthesis.
+- Text-mode microphone capture with rolling Faster-Whisper drafts in the composer and a final transcript on manual stop.
 - Personal, bundled Demo, and named local profile selection; supported profile context is inserted through the existing system-prompt template placeholder.
 - Profile schema validation and prompt assembly covered by automated unit tests; these do not verify a live microphone session.
 

@@ -74,6 +74,36 @@ ZOOM_STEP = 0.1
 def _clamp_zoom(factor: float) -> float:
     return round(min(MAX_ZOOM, max(MIN_ZOOM, float(factor))), 2)
 
+
+def _merge_transcript_draft(current: str, candidate: str) -> str:
+    """Join overlapping rolling STT drafts without repeating their shared words."""
+    current_words = current.split()
+    candidate_words = candidate.split()
+    if not current_words:
+        return candidate.strip()
+    if not candidate_words:
+        return current.strip()
+
+    def normalize(word: str) -> str:
+        return re.sub(r"\W+", "", word.casefold())
+
+    current_normalized = [normalize(word) for word in current_words]
+    candidate_normalized = [normalize(word) for word in candidate_words]
+
+    if candidate_normalized[:len(current_normalized)] == current_normalized:
+        return candidate.strip()
+    if current_normalized[:len(candidate_normalized)] == candidate_normalized:
+        return current.strip()
+
+    overlap = 0
+    maximum = min(len(current_words), len(candidate_words))
+    for size in range(maximum, 0, -1):
+        if current_normalized[-size:] == candidate_normalized[:size]:
+            overlap = size
+            break
+    return " ".join(current_words + candidate_words[overlap:]).strip()
+
+
 _INLINE_MARKDOWN = re.compile(
     r"(?P<image>!\[(?P<image_alt>[^\]]*)\]\([^)]+\))"
     r"|(?P<link>\[(?P<link_text>[^\]]+)\]\([^)]+\))"
@@ -320,6 +350,20 @@ class RikoDesktop:
         self.active_reply_label: MarkdownResponse | tk.Label | None = None
         self.settings_window: tk.Toplevel | None = None
         self.voice_values: list[str] = []
+        self.reply_action_widgets = {}
+        self.reply_contexts = {}
+        self.latest_text_reply_body = None
+        self.read_aloud_tts = None
+        self.read_aloud_active = False
+        self.read_aloud_stop_event = None
+        self.read_aloud_button = None
+        self.read_aloud_lock = threading.Lock()
+        self.mic_recording = False
+        self.mic_stop_requested = False
+        self.mic_stop_event = None
+        self.mic_thread = None
+        self.mic_original_text = ""
+        self.mic_partial_text = ""
         self.zoom_factor = 1.0
         self.zoom_value_var = tk.StringVar(value="100%")
         self._base_font_specs = {}
@@ -920,6 +964,22 @@ class RikoDesktop:
         )
         self.send_button.pack(side="right")
 
+        self.mic_button = self._button(
+            toolbar,
+            "🎙",
+            self.toggle_mic_recording,
+            bg=COLORS["panel_lighter"],
+            fg=COLORS["text"],
+            activebackground=COLORS["border"],
+            padx=11,
+            pady=7,
+            width=3,
+            font=(UI_FONT_FAMILY, 11),
+            takefocus=True,
+        )
+        self.mic_button.pack(side="right", padx=(0, 7))
+        self._refresh_mic_button()
+
         note = tk.Frame(footer, bg=COLORS["background"])
         note.grid(row=2, column=0, sticky="ew", pady=(8, 0))
         tk.Label(
@@ -1050,6 +1110,9 @@ class RikoDesktop:
         if mode not in {"text", "voice"}:
             return
         current_mode = self.mode_var.get()
+        if getattr(self, "mic_recording", False) and mode != current_mode:
+            self.status_var.set("Stop microphone transcription before changing modes.")
+            return
         if mode == current_mode:
             if mode == "voice" and not self.voice_session_active and not self.busy:
                 self.start_voice_session()
@@ -1094,8 +1157,15 @@ class RikoDesktop:
             if self.voice_session_active:
                 self.voice_status_label.configure(text="Stopping voice chat…")
         self._refresh_send_button()
+        self._refresh_mic_button()
 
-    def _add_message(self, role: str, text: str) -> MarkdownResponse | tk.Label:
+    def _add_message(
+        self,
+        role: str,
+        text: str,
+        *,
+        with_actions: bool = False,
+    ) -> MarkdownResponse | tk.Label:
         is_user = role == "you"
         row = tk.Frame(self.message_frame, bg=COLORS["background"])
         row.pack(fill="x", padx=42, pady=(11, 3))
@@ -1138,24 +1208,251 @@ class RikoDesktop:
             )
             body.set_markdown(text or " ")
         body.pack(fill="x", padx=4, pady=(0, 11))
+        if not is_user and with_actions:
+            actions = tk.Frame(bubble, bg=bubble_color)
+            actions.pack(fill="x", padx=14, pady=(0, 10))
+            regenerate_button = self._button(
+                actions,
+                "↻  Regenerate",
+                lambda target=body: self.regenerate_reply(target),
+                bg=bubble_color,
+                fg=COLORS["muted"],
+                activebackground=COLORS["panel_lighter"],
+                padx=8,
+                pady=4,
+                font=(UI_FONT_FAMILY, 8),
+            )
+            regenerate_button.pack(side="left", padx=(0, 6))
+            read_button = self._button(
+                actions,
+                "▶  Read aloud",
+                lambda target=body: self.toggle_read_aloud(target),
+                bg=bubble_color,
+                fg=COLORS["muted"],
+                activebackground=COLORS["panel_lighter"],
+                padx=8,
+                pady=4,
+                font=(UI_FONT_FAMILY, 8),
+            )
+            read_button.pack(side="left")
+            self.reply_action_widgets[body] = {
+                "regenerate": regenerate_button,
+                "read_aloud": read_button,
+            }
         self._schedule_zoom()
         return body
 
     def _set_reply_content(self, text: str) -> None:
         if self.active_reply_label is None:
             return
+        context = getattr(self, "reply_contexts", {}).get(self.active_reply_label)
+        if context is not None:
+            context["text"] = text
         render_markdown = getattr(self.active_reply_label, "set_markdown", None)
         if callable(render_markdown):
             render_markdown(text or " ")
         else:
             self.active_reply_label.configure(text=text or " ")
 
+    def _refresh_reply_action_buttons(self) -> None:
+        if not hasattr(self, "reply_action_widgets"):
+            return
+        try:
+            read_aloud_enabled = self.settings.get_text_to_voice_enabled()
+        except (AttributeError, TypeError):
+            read_aloud_enabled = True
+
+        for body, buttons in self.reply_action_widgets.items():
+            context = self.reply_contexts.get(body)
+            text = context.get("text", "").strip() if context else ""
+            is_generating = bool(self.busy and self.active_reply_label is body)
+            can_regenerate = bool(
+                context
+                and body is self.latest_text_reply_body
+                and not self.busy
+                and not self.mic_recording
+                and not self.voice_session_active
+            )
+            can_read = bool(
+                read_aloud_enabled
+                and context
+                and text
+                and text != "…"
+                and not is_generating
+            )
+            buttons["regenerate"].configure(
+                state="normal" if can_regenerate else "disabled",
+            )
+            is_active_button = body is self.read_aloud_button
+            if is_active_button and self.read_aloud_active:
+                buttons["read_aloud"].configure(
+                    text="■  Stop audio",
+                    state="normal" if not self.mic_recording else "disabled",
+                    fg=COLORS["danger"],
+                )
+            else:
+                buttons["read_aloud"].configure(
+                    text="▶  Read aloud",
+                    state=(
+                        "normal"
+                        if can_read
+                        and not self.read_aloud_active
+                        and not self.mic_recording
+                        else "disabled"
+                    ),
+                    fg=COLORS["muted"],
+                )
+
+    def regenerate_reply(self, body) -> None:
+        context = self.reply_contexts.get(body)
+        if (
+            context is None
+            or body is not self.latest_text_reply_body
+            or self.busy
+            or self.voice_session_active
+            or self.mic_recording
+        ):
+            return
+        if self.read_aloud_active:
+            self._stop_read_aloud()
+
+        conversation = context["conversation"]
+        history = [dict(item) for item in context["history"]]
+        if history and history[0].get("role") == "system":
+            history[0]["content"] = self.prompts.build_prompt(mode="text")
+        conversation.messages[:] = history
+        begin_response = getattr(conversation, "begin_response", None)
+        if callable(begin_response):
+            begin_response()
+
+        message = context["message"]
+        context["text"] = ""
+        self.active_reply_label = body
+        self._set_reply_content("…")
+        self.current_reply = ""
+        self.busy = True
+        self.response_cancel_requested = False
+        self.current_turn_mode = "text"
+        self.active_conversation = conversation
+        self._refresh_send_button()
+        self._refresh_mic_button()
+        self._refresh_reply_action_buttons()
+        for button in self.mode_buttons.values():
+            button.configure(state="disabled")
+        self.status_var.set("Regenerating RIKO's reply…")
+        threading.Thread(
+            target=self._respond,
+            args=(message, conversation),
+            name="riko-desktop-regenerate",
+            daemon=True,
+        ).start()
+
+    def toggle_read_aloud(self, body) -> None:
+        if self.read_aloud_active:
+            self._stop_read_aloud()
+            return
+        try:
+            if not self.settings.get_text_to_voice_enabled():
+                self.status_var.set("Text-to-voice is disabled in Preferences.")
+                return
+        except AttributeError:
+            pass
+
+        context = self.reply_contexts.get(body)
+        if context is None:
+            return
+        try:
+            from audio.kokoro.tts import markdown_to_speech, remove_emojis
+
+            text = markdown_to_speech(remove_emojis(context.get("text", "")))
+        except Exception as error:
+            self.status_var.set(f"Could not prepare speech: {error}")
+            return
+        if not text:
+            self.status_var.set("There is no readable text in that reply.")
+            return
+
+        stop_event = threading.Event()
+        self.read_aloud_active = True
+        self.read_aloud_stop_event = stop_event
+        self.read_aloud_button = body
+        self._refresh_reply_action_buttons()
+        self.status_var.set("Reading the reply aloud with Kokoro…")
+        threading.Thread(
+            target=self._read_aloud_worker,
+            args=(text, stop_event),
+            name="riko-text-read-aloud",
+            daemon=True,
+        ).start()
+
+    def _read_aloud_worker(self, text: str, stop_event: threading.Event) -> None:
+        error = None
+        try:
+            from audio.kokoro.tts import KokoroTTS
+
+            with self.read_aloud_lock:
+                if self.read_aloud_tts is None:
+                    settings = self.settings.get_tts_settings()
+                    self.read_aloud_tts = KokoroTTS(
+                        voice=self.settings.get_tts_voice(),
+                        speed=float(settings.get("speed", 1.0)),
+                        lang=settings.get("language", "en-us"),
+                    )
+                else:
+                    settings = self.settings.get_tts_settings()
+                    self.read_aloud_tts.voice = self.settings.get_tts_voice()
+                    self.read_aloud_tts.speed = float(settings.get("speed", 1.0))
+                    self.read_aloud_tts.lang = settings.get("language", "en-us")
+                tts = self.read_aloud_tts
+            tts.speak_text(text, cancel_event=stop_event)
+        except Exception as exc:
+            error = str(exc)
+        finally:
+            self.events.put(("read_aloud_done", (stop_event, error)))
+
+    def _stop_read_aloud(self) -> None:
+        stop_event = self.read_aloud_stop_event
+        if stop_event is not None:
+            stop_event.set()
+        with self.read_aloud_lock:
+            tts = self.read_aloud_tts
+        if tts is not None:
+            try:
+                tts.stop()
+            except Exception as error:
+                self.status_var.set(f"Could not stop speech playback: {error}")
+        if self.read_aloud_active:
+            self.status_var.set("Stopping read-aloud playback…")
+
+    def _finish_read_aloud(self, payload) -> None:
+        stop_event, error = payload
+        if stop_event is not self.read_aloud_stop_event:
+            return
+        was_stopped = stop_event.is_set()
+        self.read_aloud_active = False
+        self.read_aloud_stop_event = None
+        self.read_aloud_button = None
+        self._refresh_reply_action_buttons()
+        if error:
+            self.status_var.set(f"Read aloud failed: {error}")
+        elif not self.busy:
+            self.status_var.set(
+                "Read-aloud playback stopped."
+                if was_stopped
+                else "Finished reading the reply."
+            )
+
     def new_conversation(self) -> None:
-        if self.busy or self.voice_session_active:
+        if self.busy or self.voice_session_active or getattr(self, "mic_recording", False):
             self.status_var.set("Finish the current activity before starting a new conversation.")
             return
+        if self.read_aloud_active:
+            self._stop_read_aloud()
         self.conversation = None
         self.text_session = None
+        self.reply_action_widgets.clear()
+        self.reply_contexts.clear()
+        self.latest_text_reply_body = None
         for child in self.message_frame.winfo_children():
             child.destroy()
         self._show_welcome()
@@ -1165,7 +1462,7 @@ class RikoDesktop:
     def send_message(self) -> None:
         if self.mode_var.get() != "text":
             return
-        if self.busy or self.voice_session_active:
+        if self.busy or self.voice_session_active or getattr(self, "mic_recording", False):
             return
         message = self.input.get("1.0", "end-1c").strip()
         if not message:
@@ -1176,6 +1473,154 @@ class RikoDesktop:
             return
 
         self._start_message(message, "text")
+
+    def _refresh_mic_button(self) -> None:
+        button = getattr(self, "mic_button", None)
+        mode_var = getattr(self, "mode_var", None)
+        if button is None or mode_var is None:
+            return
+        if mode_var.get() != "text":
+            button.pack_forget()
+            return
+        button.pack(side="right", padx=(0, 7))
+        if self.mic_recording and self.mic_stop_requested:
+            button.configure(
+                text="…",
+                state="disabled",
+                bg=COLORS["panel_lighter"],
+                fg=COLORS["muted"],
+            )
+        elif self.mic_recording:
+            button.configure(
+                text="■",
+                state="normal",
+                bg=COLORS["danger"],
+                fg="#1c1114",
+                activebackground="#f1a3ad",
+            )
+        else:
+            enabled = not self.busy and not self.voice_session_active
+            button.configure(
+                text="🎙",
+                state="normal" if enabled else "disabled",
+                bg=COLORS["panel_lighter"],
+                fg=COLORS["text"],
+                activebackground=COLORS["border"],
+            )
+
+    def toggle_mic_recording(self) -> None:
+        if self.mic_recording:
+            self.stop_mic_recording()
+            return
+        if self.mode_var.get() != "text":
+            return
+        if self.busy or self.voice_session_active:
+            self.status_var.set("Wait for the current reply before recording a message.")
+            return
+
+        if self.read_aloud_active:
+            self._stop_read_aloud()
+        self.mic_original_text = self.input.get("1.0", "end-1c")
+        self.mic_partial_text = ""
+        self.mic_stop_event = threading.Event()
+        self.mic_recording = True
+        self.mic_stop_requested = False
+        self.input.configure(state="disabled")
+        for button in self.mode_buttons.values():
+            button.configure(state="disabled")
+        self._refresh_send_button()
+        self._refresh_mic_button()
+        self._refresh_reply_action_buttons()
+        self.status_var.set("Listening… speak, then press the microphone button again to finish.")
+        self.mic_thread = threading.Thread(
+            target=self._run_mic_recording,
+            args=(self.mic_stop_event,),
+            name="riko-desktop-microphone-transcription",
+            daemon=True,
+        )
+        self.mic_thread.start()
+
+    def stop_mic_recording(self) -> None:
+        if not self.mic_recording or self.mic_stop_requested:
+            return
+        self.mic_stop_requested = True
+        if self.mic_stop_event is not None:
+            self.mic_stop_event.set()
+        self.status_var.set("Finishing transcription…")
+        self._refresh_mic_button()
+
+    def _run_mic_recording(self, stop_event: threading.Event) -> None:
+        try:
+            from audio.stt.streaming_voice_input import StreamingVoiceInput
+
+            voice_input = StreamingVoiceInput(
+                model_size="base",
+                device="cpu",
+                compute_type="int8",
+                language_mode="auto",
+                max_record_seconds=120.0,
+                update_interval=0.8,
+                window_seconds=6.0,
+            )
+            transcript = voice_input.listen_once(
+                stop_event=stop_event,
+                on_partial=lambda text: self.events.put(("mic_partial", text)),
+                finalize_on_stop=True,
+                manual_stop=True,
+            )
+            self.events.put(("mic_recording_done", (transcript, None)))
+        except Exception as error:
+            self.events.put(("mic_recording_done", ("", str(error))))
+
+    def _set_composer_text(self, text: str) -> None:
+        self.input.configure(state="normal")
+        self.input.delete("1.0", "end")
+        if text:
+            self.input.insert("1.0", text)
+        self.input.mark_set("insert", "end-1c")
+        self.input.configure(state="disabled" if self.mic_recording else "normal")
+
+    def _apply_mic_partial(self, partial: str) -> None:
+        if not self.mic_recording or self.mic_stop_requested:
+            return
+        partial = partial.strip()
+        if not partial:
+            return
+        self.mic_partial_text = _merge_transcript_draft(
+            self.mic_partial_text,
+            partial,
+        )
+        prefix = self.mic_original_text
+        separator = "\n" if prefix and self.mic_partial_text else ""
+        self._set_composer_text(prefix + separator + self.mic_partial_text)
+
+    def _finish_mic_recording(self, payload) -> None:
+        transcript, error = payload
+        base_text = self.mic_original_text
+        recognized_text = str(transcript or "").strip() or self.mic_partial_text
+        self.mic_recording = False
+        self.mic_stop_requested = False
+        self.mic_stop_event = None
+        self.mic_thread = None
+        if recognized_text:
+            separator = "\n" if base_text else ""
+            self._set_composer_text(base_text + separator + recognized_text)
+        else:
+            self._set_composer_text(base_text)
+        for button in self.mode_buttons.values():
+            button.configure(state="normal")
+        self._refresh_send_button()
+        self._refresh_mic_button()
+        self._refresh_reply_action_buttons()
+        if error:
+            self.status_var.set(f"Microphone transcription failed: {error}")
+        elif transcript:
+            self.status_var.set("Transcript added to the message. Review it, then press Send.")
+        elif recognized_text:
+            self.status_var.set("Final transcription was empty; kept the live draft for you to review.")
+        else:
+            self.status_var.set("No speech was recognized. You can try again or type a message.")
+        self.input.focus_set()
 
     def handle_voice_transcription(self, transcript: str) -> None:
         """Append a transcript produced by the shared CLI voice pipeline."""
@@ -1193,7 +1638,7 @@ class RikoDesktop:
     def _start_message(self, message: str, mode: str) -> None:
         if mode != "text":
             raise ValueError("Only the text composer can start typed messages.")
-        if self.busy or self.voice_session_active:
+        if self.busy or self.voice_session_active or self.mic_recording:
             return
         message = message.strip()
         if not message:
@@ -1204,6 +1649,7 @@ class RikoDesktop:
             return
         try:
             conversation = self._conversation_for("text")
+            history_before_turn = [dict(item) for item in conversation.messages]
             begin_response = getattr(conversation, "begin_response", None)
             if callable(begin_response):
                 begin_response()
@@ -1213,15 +1659,30 @@ class RikoDesktop:
         if getattr(self, "welcome_frame", None) is not None:
             self.welcome_frame.destroy()
             self.welcome_frame = None
+        if self.read_aloud_active:
+            self._stop_read_aloud()
         self._add_message("you", message)
         self.input.delete("1.0", "end")
         self.current_reply = ""
-        self.active_reply_label = self._add_message("riko", "…")
+        self.active_reply_label = self._add_message(
+            "riko",
+            "…",
+            with_actions=True,
+        )
+        self.reply_contexts[self.active_reply_label] = {
+            "message": message,
+            "conversation": conversation,
+            "history": history_before_turn,
+            "text": "",
+        }
+        self.latest_text_reply_body = self.active_reply_label
         self.busy = True
         self.response_cancel_requested = False
         self.current_turn_mode = mode
         self.active_conversation = conversation
         self._refresh_send_button()
+        self._refresh_mic_button()
+        self._refresh_reply_action_buttons()
         for button in self.mode_buttons.values():
             button.configure(state="disabled")
         self.status_var.set("RIKO is thinking…")
@@ -1333,7 +1794,14 @@ class RikoDesktop:
             button.pack_forget()
 
         busy = bool(getattr(self, "busy", False))
-        if getattr(self, "voice_stopping", False) and mode == "text":
+        if getattr(self, "mic_recording", False) and mode == "text":
+            button.configure(
+                text="Send  ↗",
+                state="disabled",
+                bg=COLORS["panel_lighter"],
+                fg=COLORS["muted"],
+            )
+        elif getattr(self, "voice_stopping", False) and mode == "text":
             button.configure(
                 text="Stopping…",
                 state="disabled",
@@ -1500,6 +1968,12 @@ class RikoDesktop:
             if event == "voice_pipeline":
                 pipeline_event, pipeline_payload = payload
                 self._handle_voice_pipeline_event(pipeline_event, pipeline_payload)
+            elif event == "mic_partial":
+                self._apply_mic_partial(str(payload))
+            elif event == "mic_recording_done":
+                self._finish_mic_recording(payload)
+            elif event == "read_aloud_done":
+                self._finish_read_aloud(payload)
             elif event == "token":
                 self.current_reply += str(payload)
                 self._set_reply_content(self.current_reply or "…")
@@ -1513,6 +1987,8 @@ class RikoDesktop:
                     self._set_reply_content("Response stopped.")
                 self.active_conversation = None
                 self._refresh_send_button()
+                self._refresh_mic_button()
+                self._refresh_reply_action_buttons()
                 for button in self.mode_buttons.values():
                     button.configure(state="normal")
                 self.status_var.set(
@@ -1529,6 +2005,8 @@ class RikoDesktop:
                 self.response_cancel_requested = False
                 self.active_conversation = None
                 self._refresh_send_button()
+                self._refresh_mic_button()
+                self._refresh_reply_action_buttons()
                 for button in self.mode_buttons.values():
                     button.configure(state="normal")
                 self.status_var.set(str(payload))
@@ -1561,6 +2039,9 @@ class RikoDesktop:
                     )
             elif event == "settings_saved":
                 self.persona_badge.configure(text=self._persona_name())
+                self._refresh_reply_action_buttons()
+                if not self.settings.get_text_to_voice_enabled() and self.read_aloud_active:
+                    self._stop_read_aloud()
                 if self.voice_session is not None:
                     try:
                         self.voice_session.update_runtime_preferences()
@@ -1637,6 +2118,32 @@ class RikoDesktop:
             justify="left",
             wraplength=420,
         ).pack(anchor="w", pady=(0, 16))
+
+        self.text_to_voice_var = tk.BooleanVar(
+            value=self.settings.get_text_to_voice_enabled(),
+        )
+        tk.Checkbutton(
+            body,
+            text="Enable text in, voice out",
+            variable=self.text_to_voice_var,
+            bg=COLORS["background"],
+            fg=COLORS["text"],
+            activebackground=COLORS["background"],
+            activeforeground=COLORS["text"],
+            selectcolor=COLORS["panel_lighter"],
+            font=(UI_FONT_FAMILY, 9, "bold"),
+            anchor="w",
+            highlightthickness=0,
+        ).pack(fill="x", pady=(0, 3))
+        tk.Label(
+            body,
+            text="Shows a Read aloud action for text replies. Speech is only played when you choose it.",
+            bg=COLORS["background"],
+            fg=COLORS["quiet"],
+            font=(UI_FONT_FAMILY, 8),
+            justify="left",
+            wraplength=420,
+        ).pack(anchor="w", pady=(0, 14))
 
         personas = self.prompts.list_personas()
         self.persona_choice = tk.StringVar(value=self.settings.get_persona())
@@ -1771,6 +2278,9 @@ class RikoDesktop:
             if self.voice_values:
                 self.settings.set_tts_voice(voice, self.voice_values)
             self.settings.set_tts_speed(float(self.speed_var.get()))
+            self.settings.set_text_to_voice_enabled(
+                bool(self.text_to_voice_var.get())
+            )
         except (ValueError, OSError) as error:
             messagebox.showerror("Could not save preferences", str(error), parent=self.settings_window)
             return
@@ -2173,6 +2683,10 @@ class RikoDesktop:
         return result
 
     def close(self) -> None:
+        if self.mic_stop_event is not None:
+            self.mic_stop_event.set()
+        if self.read_aloud_active:
+            self._stop_read_aloud()
         if self.voice_session is not None:
             self.voice_session.stop()
         self.root.destroy()

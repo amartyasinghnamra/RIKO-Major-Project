@@ -137,13 +137,21 @@ class KokoroTTS:
         )
         return samples, sample_rate
 
-    def speak_text(self, text: str) -> None:
+    def speak_text(
+        self,
+        text: str,
+        cancel_event: threading.Event | None = None,
+    ) -> None:
         """Synthesize and play one complete piece of text."""
         if not text or not text.strip():
             return
 
         with self._operation_lock:
+            if cancel_event is not None and cancel_event.is_set():
+                return
             samples, sample_rate = self.synthesize(text)
+            if cancel_event is not None and cancel_event.is_set():
+                return
             self._playback.play_samples(samples, sample_rate)
 
     def speak_multiline(self, text: str) -> None:
