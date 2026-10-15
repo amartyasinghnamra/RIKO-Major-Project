@@ -27,8 +27,6 @@
 - Python compilation, Linux shell syntax checks, AppImage desktop-entry validation, package staging checks, and `git diff --check` passed.
 - Built `build/output/RIKO-Setup.exe` with Inno Setup and `build/output/RIKO-x86_64.AppImage` in Ubuntu WSL.
 
-### Commit status
-
 ### Artifact policy
 
 - Generated installers stay under the ignored `build/` directory; model weights and private local profiles are not committed.
