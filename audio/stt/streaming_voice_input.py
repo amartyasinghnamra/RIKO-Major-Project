@@ -64,8 +64,12 @@ class StreamingVoiceInput:
 
         log_event("STT", "Transcription engine initialized")
 
-    def listen_once(self) -> str:
-        """Capture one utterance, display draft transcripts, and finalize it."""
+    def listen_once(self, stop_event: threading.Event | None = None) -> str:
+        """Capture one utterance, display draft transcripts, and finalize it.
+
+        ``stop_event`` lets a host UI end an active listening session without
+        replacing this pipeline's silence detection or transcription logic.
+        """
 
         listen_started = monotonic()
 
@@ -88,6 +92,7 @@ class StreamingVoiceInput:
         worker_stop = object()
 
         speech_started = False
+        cancelled = False
         started = monotonic()
         speech_started_at = None
         last_update = started
@@ -182,6 +187,10 @@ class StreamingVoiceInput:
                 log_event("STT", "Microphone capture active")
 
                 while True:
+                    if stop_event is not None and stop_event.is_set():
+                        cancelled = True
+                        break
+
                     now = monotonic()
                     elapsed = now - started
 
@@ -289,6 +298,10 @@ class StreamingVoiceInput:
                     monotonic() - listen_started, 3
                 ),
             )
+
+        if cancelled or (stop_event is not None and stop_event.is_set()):
+            log_event("STT", "Listening session stopped by host")
+            return ""
 
         if not speech_started or not audio_chunks:
             log_event("STT", "No speech captured")

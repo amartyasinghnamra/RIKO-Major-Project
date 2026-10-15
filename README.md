@@ -7,11 +7,12 @@ RIKO is a modular, local-first AI companion for text and voice interaction. It s
 ## Features
 
 - **Local LLM integration:** Connects to Ollama using `qwen3:4b-instruct`.
-- **Text and voice modes:** Select Text Chat or Voice Chat from the application entry point.
+- **Text and voice modes:** Select Text Chat or Voice Chat from the terminal menu or the GUI.
+- **Cross-platform desktop GUI:** A native Tkinter window calls RIKO's Python conversation, microphone, Faster-Whisper, Kokoro, and audio playback components directly. It does not use a browser or local GUI web server.
 - **Streaming responses:** Supports incremental model output.
 - **Speech recognition:** Includes microphone capture and a Faster-Whisper speech-to-text (STT) pipeline.
 - **Speech synthesis:** Uses Kokoro ONNX for local text-to-speech (TTS) and audio playback.
-- **Prompt and persona management:** Keeps prompts, persona settings, user-profile configuration, and mode-specific styles separate.
+- **Profiles and personas:** Offers an editable private profile, selectable bundled/custom profile contexts, and separate persona behavior settings.
 - **Conversation management:** Maintains session history and coordinates model interactions.
 - **Architecture-aware answers:** An allow-listed tool retrieves documented information about RIKO's architecture, modules, configuration, and capabilities.
 - **Modular startup:** Text Chat can be selected without immediately importing voice-specific dependencies.
@@ -68,17 +69,18 @@ This is a conceptual overview; it does not imply that every path or feature is p
 - **Windows:** Windows 10/11, CMD, Git, `curl.exe`, and `winget` for automatic Python/Ollama installation when missing. Python 3.10+ is required; Python 3.11 is installed by winget if needed.
 - **Linux:** Debian/Ubuntu with `apt-get`, `sudo` (or root), and Python 3.10+ available through distribution repositories. The installer installs Python venv/build tools, audio libraries, and Ollama.
 - Internet access and enough free disk space for the Python environment, Ollama model, Kokoro files (about 120 MB combined), and Faster-Whisper model cache.
-- A working microphone and audio output device for live Voice Chat.
+- Tkinter desktop support (included with standard Windows Python distributions; installed by the Debian/Ubuntu installer).
+- A working microphone and audio output device for live Voice Chat and the desktop GUI's Voice mode.
 
 ## Install and run
 
-The root-level install scripts create or reuse a project-local `.venv-tts`, install Python requirements, fetch Kokoro model and voice files, install/check Ollama, download `qwen3:4b-instruct`, warm the Faster-Whisper `base` cache, and finally run the separate interactive profile setup. They are designed to be safely rerun. Existing model files are preserved and checked for a minimum size; an existing local profile is preserved unchanged.
+The root-level install scripts create or reuse a project-local `.venv-tts`, install Python requirements, fetch Kokoro model and voice files, install/check Ollama, download `qwen3:4b-instruct`, warm the Faster-Whisper `base` cache, and finally run the separate interactive profile setup when no personal profile exists. The profile setup asks before saving. Installers are designed to be safely rerun; existing model files and profiles are preserved.
 
 ### Windows CMD
 
 ```bat
-git clone https://github.com/amartyasinghnamra/RIKO-Major-Project.git RIKO_PROJECT
-cd RIKO_PROJECT
+git clone https://github.com/amartyasinghnamra/RIKO-Major-Project.git
+cd RIKO-Major-Project
 install.bat
 run.bat
 ```
@@ -88,25 +90,55 @@ Git is needed to clone the repository. If Python, Ollama, or curl is missing, `i
 ### Linux (Debian/Ubuntu)
 
 ```sh
-git clone https://github.com/amartyasinghnamra/RIKO-Major-Project.git RIKO_PROJECT
-cd RIKO_PROJECT
+git clone https://github.com/amartyasinghnamra/RIKO-Major-Project.git
+cd RIKO-Major-Project
 bash install.sh
 bash run.sh
 ```
 
-`install.sh` uses `sudo` to install apt packages and Ollama. Other Linux distributions are not auto-configured; install Python 3.10+, venv/pip, a compiler toolchain, PortAudio, libsndfile, libespeak-ng, curl, and Ollama before adapting/running the script. The virtual environment is always project-local and `run.sh` invokes it without needing shell activation.
+`install.sh` uses `sudo` to install apt packages, Tkinter, and Ollama. Other Linux distributions are not auto-configured; install Python 3.10+, venv/pip, Tkinter, a compiler toolchain, PortAudio, libsndfile, libespeak-ng, curl, and Ollama before adapting/running the script. The virtual environment is always project-local and `run.sh` invokes it without needing shell activation.
+
+### Graphical interface
+
+RIKO also includes a native desktop GUI built with Python's Tkinter toolkit. The GUI and terminal menu use the shared mode functions in `src/main.py`: `create_chat_session`, `run_text_chat`, and `run_voice_chat`. Voice chat uses the same `VoiceChatSession` as the CLI: its `StreamingVoiceInput` detects utterance boundaries, Faster-Whisper transcribes speech, Ollama streams a reply into Kokoro's speech pipeline, and the barge-in monitor can interrupt playback. The GUI displays the recognized transcript and streamed response while the voice session stays hands-free; the text composer is hidden in Voice mode. Select **Voice** to start listening automatically, then select **Chat** to stop listening and playback. The GUI has no separate record control. Microphone and speaker access use the operating system's audio devices directly; there is no browser permission prompt or local GUI web server.
+
+While a reply is generating, the **Send** button changes to **■ Stop**; pressing it or **Escape** cancels the active Ollama stream and Kokoro playback. In Voice mode the session stays active and returns to listening. Speaking over a voice reply also stops generation and captures the interruption; short commands such as “stop,” “wait,” “pause,” or “hold on” are treated as controls instead of new questions. Headphones are recommended because this prototype does not include acoustic echo cancellation. Preferences can be saved while a reply is running: conversation style applies to the next model turn, while Kokoro voice and pace apply to the next spoken phrase.
+
+The desktop UI can be zoomed from **80% to 160%** using the **− / +** controls beside the persona name. Use **Ctrl + Plus** (or **Ctrl + =**) and **Ctrl + -** to zoom on Windows/Linux, or **Command + Plus/Minus** on macOS; **Ctrl/Command + 0** resets to 100%. Holding Ctrl/Command while using the mouse wheel also zooms. Rounded cards and chat surfaces are drawn with Tkinter Canvas, so this styling does not depend on Windows-only window effects; the operating system continues to draw the title bar.
+
+Windows CMD: run-gui.bat
+
+Debian/Ubuntu Linux: bash run-gui.sh
+
+The GUI uses the same `.venv-tts`, Ollama model, Kokoro assets, local persona, speech settings, and selected profile context as the CLI. Its **Your profile** page lets you select Personal, Demo, or another available profile for prompt context and edit your private personal profile. Close the desktop window to exit.
 
 ### Profile and local assets
 
-After dependency and model setup succeeds, the installer calls `src/create_user_profile.py` as a separate interactive step. You can skip saving at the confirmation prompt and create it later with the `.venv-tts` Python interpreter. The profile lives in Git-ignored `config/local/user_profile.json`; an existing profile is never overwritten by the installer. Project prompts, personas, and other tracked files come from the clone. The installers do not copy the repository tree or process Git-ignored paths. Kokoro assets go under Git-ignored `models/kokoro/`; partial downloads are ignored too. Large/generated model files and local user configuration are not included in Git. Review upstream model and voice terms before redistribution.
+After dependency and model setup succeeds, the installer calls `src/create_user_profile.py` as a separate interactive step when no personal profile exists. The profile covers optional identity, interests, goals, learning preferences, and response preferences. Saving or replacing requires explicit confirmation. The personal profile lives in Git-ignored `config/local/user_profile.json`; additional named profiles can be created with `python src/create_user_profile.py --id study` and are saved under `config/local/profiles/`. Select the active profile in the GUI's profile page or the CLI Settings menu. A fictional, read-only Demo profile is included at `config/examples/profiles/demo.json`; it is only used when explicitly selected. `PromptManager` inserts the active profile data through the existing `{user_profile}` placeholder when it assembles the system prompt; the source `prompts/system_prompt.txt` is not rewritten. Personal/named profile data and settings stay local and are not committed; the bundled Demo preset is tracked. Project prompts, personas, and other tracked files come from the clone. The installers do not copy the repository tree or process Git-ignored paths. Kokoro assets go under Git-ignored `models/kokoro/`; partial downloads are ignored too. Large/generated model files and local user configuration are not included in Git. Review upstream model and voice terms before redistribution.
 
-The menu offers:
+The terminal menu offers:
 
 - `1` — Text Chat
 - `2` — Voice Chat
 - `0` — Exit
 
+The Settings menu can also select which profile context is used by the next chat session. Create or edit local profiles from the repository root with:
+
+```bat
+python src\create_user_profile.py
+python src\create_user_profile.py --id study
+```
+
+```sh
+.venv-tts/bin/python src/create_user_profile.py
+.venv-tts/bin/python src/create_user_profile.py --id study
+```
+
+The GUI and CLI both build system context through `PromptManager`. Profile data is supplied through the main prompt template's existing `{user_profile}` placeholder; the template itself is not rewritten.
+
 Text Chat requires the local Ollama service and downloaded chat model. Voice Chat additionally requires the speech/audio packages and model assets installed by the OS-specific installer, plus a microphone and audio output device. Faster-Whisper may use additional model cache space on its first load if the cache was cleared.
+
+The current website content and design constraints are recorded in [website_prompt.md](website_prompt.md). Keep its implementation claims aligned with the tested project capabilities.
 
 ## Development and Testing
 
@@ -143,6 +175,7 @@ RIKO-Major-Project/
 ├── config/
 │   ├── defaults/
 │   ├── examples/
+│   │   └── profiles/       # Bundled fictional profile presets
 │   ├── local/               # Private local configuration
 │   └── personas/
 ├── knowledge/
@@ -150,12 +183,15 @@ RIKO-Major-Project/
 ├── models/
 │   └── kokoro/              # Local model assets; weights are not committed
 ├── prompts/                 # System prompts and mode styles
+├── GUI/                     # Native Tkinter desktop chat and voice interface
 ├── src/
 │   ├── modes/               # Text Chat and Voice Chat
 │   ├── tools/               # Architecture-information tool
 │   ├── conversation_manager.py
 │   ├── debug_logger.py
 │   ├── ollama_client.py
+│   ├── user_profile.py      # Profile schema validation and normalization
+│   ├── create_user_profile.py # Interactive local profile setup/editor
 │   └── prompt_manager.py
 ├── tests/
 │   ├── unit/
@@ -166,6 +202,8 @@ RIKO-Major-Project/
 ├── install.sh
 ├── run.bat
 ├── run.sh
+├── run-gui.bat
+├── run-gui.sh
 ├── .gitignore
 └── README.md
 ```

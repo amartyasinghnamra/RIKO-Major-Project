@@ -1,11 +1,15 @@
 
 import json
+import re
 from pathlib import Path
 
 from settings_manager import SettingsManager
+from user_profile import normalize_profile
 
 
 DEFAULT_PERSONA = "assistant"
+DEFAULT_PROFILE = "user"
+_PROFILE_ID = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 def deep_merge(base, override):
@@ -51,6 +55,8 @@ class PromptManager:
         self.example_profile_path = (
             config_dir / "examples" / "user_profile.example.json"
         )
+        self.public_profiles_dir = config_dir / "examples" / "profiles"
+        self.local_profiles_dir = config_dir / "local" / "profiles"
 
         prompts_dir = self.project_root / "prompts"
         self.template_path = prompts_dir / "system_prompt.txt"
@@ -172,11 +178,107 @@ class PromptManager:
         return behavior
 
     def resolve_profile(self):
-        """Load the user's profile, falling back to the example."""
-        if self.profile_path.exists():
-            return self.load_json(self.profile_path)
+        """Load the selected local profile or a bundled profile preset."""
+        return self.load_profile(self.settings.get_profile())
 
-        return self.load_json(self.example_profile_path)
+    def list_profiles(self):
+        """List the personal profile and valid bundled/local profile presets."""
+        profiles = {
+            DEFAULT_PROFILE: {
+                "id": DEFAULT_PROFILE,
+                "name": "Personal profile",
+                "description": "Your private profile saved on this computer.",
+                "source": "local",
+            }
+        }
+
+        # Bundled profile examples are read-only. A same-named local profile
+        # takes precedence so users can keep private copies or custom profiles.
+        for directory in (self.public_profiles_dir, self.local_profiles_dir):
+            if not directory.is_dir():
+                continue
+            for path in sorted(directory.glob("*.json")):
+                profile_id = path.stem
+                if (
+                    profile_id == DEFAULT_PROFILE
+                    or not _PROFILE_ID.fullmatch(profile_id)
+                ):
+                    continue
+                try:
+                    raw_profile = self.load_json(path)
+                    normalize_profile(raw_profile)
+                except (json.JSONDecodeError, OSError, ValueError):
+                    continue
+
+                metadata = raw_profile.get("_meta", {})
+                if not isinstance(metadata, dict):
+                    metadata = {}
+                name = metadata.get("name")
+                description = metadata.get("description", "")
+                profiles[profile_id] = {
+                    "id": profile_id,
+                    "name": (
+                        name.strip()
+                        if isinstance(name, str) and name.strip()
+                        else profile_id.replace("_", " ").title()
+                    ),
+                    "description": (
+                        description.strip()
+                        if isinstance(description, str)
+                        else ""
+                    ),
+                    "source": "local" if directory == self.local_profiles_dir else "bundled",
+                }
+
+        return [profiles[key] for key in sorted(profiles)]
+
+    def select_profile(self, profile_id):
+        """Persist a profile selection after checking it is available."""
+        available_ids = {profile["id"] for profile in self.list_profiles()}
+        if not isinstance(profile_id, str) or profile_id not in available_ids:
+            raise ValueError(
+                f"Unknown profile {profile_id!r}. Available profiles: "
+                f"{', '.join(sorted(available_ids))}"
+            )
+        self.settings.set_profile(profile_id)
+
+    def profile_storage_path(self, profile_id):
+        """Return a writable path for a personal or custom local profile."""
+        if profile_id == DEFAULT_PROFILE:
+            return self.profile_path
+        if not isinstance(profile_id, str) or not _PROFILE_ID.fullmatch(profile_id):
+            raise ValueError(f"Invalid profile id: {profile_id!r}")
+        local_path = self.local_profiles_dir / f"{profile_id}.json"
+        if local_path.exists():
+            return local_path
+        if (self.public_profiles_dir / f"{profile_id}.json").exists():
+            raise ValueError(
+                f"The bundled {profile_id!r} profile is read-only. "
+                "Copy it to a new profile id before editing."
+            )
+        return local_path
+
+    def load_profile(self, profile_id=DEFAULT_PROFILE):
+        """Resolve a profile id, preferring private local files to presets."""
+        if not isinstance(profile_id, str) or not _PROFILE_ID.fullmatch(profile_id):
+            profile_id = DEFAULT_PROFILE
+
+        if profile_id == DEFAULT_PROFILE:
+            path = (
+                self.profile_path
+                if self.profile_path.exists()
+                else self.example_profile_path
+            )
+        else:
+            candidates = (
+                self.local_profiles_dir / f"{profile_id}.json",
+                self.public_profiles_dir / f"{profile_id}.json",
+            )
+            path = next((candidate for candidate in candidates if candidate.is_file()), None)
+            if path is None:
+                return self.load_profile(DEFAULT_PROFILE)
+
+        return normalize_profile(self.load_json(path))
 
     def get_persona(self):
         """Return the resolved persona."""

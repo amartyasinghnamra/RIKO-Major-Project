@@ -1,3 +1,5 @@
+import threading
+
 from conversation_manager import ConversationManager
 
 
@@ -50,3 +52,32 @@ def test_text_and_voice_prompt_modes():
     assert prompts.requested_modes == ["text", "voice"]
     assert text.messages[0]["content"] == "Prompt for text mode."
     assert voice.messages[0]["content"] == "Prompt for voice mode."
+
+
+def test_stop_response_generation_stops_the_stream_and_discards_partial_history():
+    started = threading.Event()
+
+    class CancellableClient:
+        def stream_chat_events(self, _messages, *, tools=None, cancel_event=None):
+            yield {"type": "content", "content": "partial answer"}
+            started.set()
+            while not cancel_event.wait(timeout=0.01):
+                pass
+
+    conversation = ConversationManager(FakePromptManager(), CancellableClient())
+    conversation.begin_response()
+    collected = []
+    worker = threading.Thread(
+        target=lambda: collected.extend(conversation.stream_response("hello")),
+        daemon=True,
+    )
+    worker.start()
+
+    assert started.wait(timeout=1)
+    assert conversation.stop_response_generation() is True
+    worker.join(timeout=1)
+
+    assert not worker.is_alive()
+    assert collected == ["partial answer"]
+    assert conversation.messages[-1] == {"role": "user", "content": "hello"}
+    assert conversation.stop_response_generation() is False

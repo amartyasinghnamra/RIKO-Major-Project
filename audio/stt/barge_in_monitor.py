@@ -22,7 +22,8 @@ class BargeInMonitor:
 
     def __init__(self, stt, tts, microphone_device=None,
                  energy_threshold=0.025, confirmation_seconds=0.30,
-                 silence_duration=0.8, max_record_seconds=15.0):
+                 silence_duration=0.8, max_record_seconds=15.0,
+                 on_interruption=None):
         if energy_threshold <= 0 or confirmation_seconds <= 0:
             raise ValueError("energy_threshold and confirmation_seconds must be positive")
         if silence_duration <= 0 or max_record_seconds <= 0:
@@ -34,6 +35,7 @@ class BargeInMonitor:
         self.confirmation_seconds = float(confirmation_seconds)
         self.silence_duration = float(silence_duration)
         self.max_record_seconds = float(max_record_seconds)
+        self.on_interruption = on_interruption
         self.interrupted = threading.Event()
         self.started = threading.Event()
 
@@ -87,6 +89,13 @@ class BargeInMonitor:
 
                     # Stop output immediately; keep recording until end-of-utterance.
                     self.interrupted.set()
+                    if self.on_interruption is not None:
+                        try:
+                            self.on_interruption()
+                        except Exception:
+                            # Always stop audio and finish capturing the user,
+                            # even if an optional host callback has a problem.
+                            pass
                     self.tts.stop()
                     chunks = list(pre_roll)
                     recording_started = now

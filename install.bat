@@ -48,6 +48,12 @@ if not exist .venv-tts\Scripts\python.exe (
 ) else (
     echo Reusing .venv-tts; existing environment will not be deleted.
 )
+".venv-tts\Scripts\python.exe" -c "import tkinter; print('Tkinter desktop GUI support is ready.')"
+if errorlevel 1 (
+    echo [ERROR] Tkinter is unavailable in this Python installation.
+    echo Repair or reinstall Python with Tcl/Tk support, then rerun install.bat.
+    exit /b 1
+)
 
 echo [2/6] Installing Python requirements...
 ".venv-tts\Scripts\python.exe" -m pip install --upgrade pip
@@ -83,6 +89,7 @@ if exist config\local\user_profile.json (
 
 echo.
 echo Setup complete. Launch RIKO with: run.bat
+echo Or launch the native desktop GUI with: run-gui.bat
 echo Or activate .venv-tts and run: python src\main.py
 echo.
 exit /b 0

@@ -35,6 +35,28 @@ def remove_emojis(text: str) -> str:
     )
 
 
+def markdown_to_speech(text: str) -> str:
+    """Remove Markdown presentation syntax while keeping readable content."""
+    if not isinstance(text, str):
+        raise TypeError("text must be a string")
+
+    # Keep the human-readable link or image label, not its markup or URL.
+    text = re.sub(r"!?\[([^\]]*)\]\([^)]+\)", r"\1", text)
+    text = re.sub(r"(?m)^\s{0,3}(?:```|~~~)[^\n]*", "", text)
+    text = re.sub(r"(?m)^\s{0,3}#{1,6}\s*", "", text)
+    text = re.sub(r"(?m)^\s{0,3}>+\s?", "", text)
+    text = re.sub(r"(?m)^\s{0,3}(?:[-+*]|\d+[.)])\s+", "", text)
+    text = re.sub(r"(?m)^\s*(?:-{3,}|_{3,}|\*{3,})\s*$", " ", text)
+    text = re.sub(r"<[^>]+>", "", text)
+    text = re.sub(r"\\([\\`*_{}\[\]()#+.!>~-])", r"\1", text)
+
+    # Formatting markers are silent. In particular, remove every asterisk
+    # even when an Ollama stream splits a **bold** span between tokens.
+    text = re.sub(r"[*_`~]", "", text)
+    text = text.replace("|", " ")
+    return re.sub(r"\s+", " ", text).strip()
+
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MODEL = PROJECT_ROOT / "models" / "kokoro" / "kokoro-v1.0.int8.onnx"
 DEFAULT_VOICES = PROJECT_ROOT / "models" / "kokoro" / "voices-v1.0.bin"
@@ -212,6 +234,11 @@ class KokoroTTS:
         def produce_text():
             buffer = ""
 
+            def enqueue_speech(text: str) -> None:
+                spoken = markdown_to_speech(text)
+                if spoken:
+                    text_queue.put(spoken)
+
             try:
                 for token in token_iterator:
                     if self._cancel_event.is_set():
@@ -223,14 +250,14 @@ class KokoroTTS:
                         and len(token) == 2
                         and token[0] == "__RIKO_STATUS__"
                     ):
-                        status = remove_emojis(str(token[1])).strip()
+                        status = markdown_to_speech(remove_emojis(str(token[1])))
                         if status:
                             # Preserve ordering if an answer fragment is
                             # waiting in the text buffer.
                             if buffer.strip():
-                                text_queue.put(buffer.strip())
+                                enqueue_speech(buffer.strip())
                                 buffer = ""
-                            text_queue.put(status)
+                            enqueue_speech(status)
                         continue
 
                     if not isinstance(token, str):
@@ -246,17 +273,23 @@ class KokoroTTS:
 
                     chunks, buffer = self._split_ready_chunks(buffer)
                     for chunk in chunks:
-                        text_queue.put(chunk)
+                        enqueue_speech(chunk)
 
                 chunks, buffer = self._split_ready_chunks(
                     buffer, final=True
                 )
                 for chunk in chunks:
-                    text_queue.put(chunk)
+                    enqueue_speech(chunk)
 
             except Exception as exc:
                 errors.put(exc)
             finally:
+                close = getattr(token_iterator, "close", None)
+                if callable(close):
+                    try:
+                        close()
+                    except Exception as exc:
+                        errors.put(exc)
                 text_queue.put(_END)
 
         async def synthesize_phrase(text):

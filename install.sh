@@ -10,7 +10,7 @@ echo "========================================"
 [[ "$(uname -s)" == Linux ]] || { echo "[ERROR] install.sh supports Linux only." >&2; exit 1; }
 if ! command -v apt-get >/dev/null 2>&1; then
     echo "[ERROR] Automatic Linux dependency setup currently supports Debian/Ubuntu (apt-get)." >&2
-    echo "Install Python 3.10+, venv/pip, a C build toolchain, PortAudio, libsndfile, libespeak-ng, curl, and Ollama manually." >&2
+    echo "Install Python 3.10+, venv/pip, tkinter, a C build toolchain, PortAudio, libsndfile, libespeak-ng, curl, and Ollama manually." >&2
     exit 1
 fi
 if (( EUID == 0 )); then SUDO=; elif command -v sudo >/dev/null 2>&1; then SUDO=sudo; else
@@ -18,7 +18,7 @@ if (( EUID == 0 )); then SUDO=; elif command -v sudo >/dev/null 2>&1; then SUDO=
 fi
 echo "[1/7] Installing Linux runtime/build prerequisites..."
 $SUDO apt-get update
-$SUDO apt-get install -y python3 python3-venv python3-pip python3-dev build-essential pkg-config portaudio19-dev libsndfile1 libespeak-ng1 curl ca-certificates
+$SUDO apt-get install -y python3 python3-venv python3-tk python3-pip python3-dev build-essential pkg-config portaudio19-dev libsndfile1 libespeak-ng1 curl ca-certificates
 command -v python3 >/dev/null 2>&1 || { echo "[ERROR] python3 was not installed." >&2; exit 1; }
 python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3,10) else 1)' || { echo "[ERROR] Python 3.10+ is required; this distro provides an older Python." >&2; exit 1; }
 if ! command -v ollama >/dev/null 2>&1; then
@@ -29,6 +29,7 @@ else
 fi
 echo "[3/7] Creating or reusing the project virtual environment..."
 if [[ ! -x .venv-tts/bin/python ]]; then python3 -m venv .venv-tts; else echo "Reusing .venv-tts; existing environment will not be deleted."; fi
+".venv-tts/bin/python" -c 'import tkinter; print("Tkinter desktop GUI support is ready.")' || { echo "[ERROR] Tkinter is unavailable in the project environment. Install python3-tk for the system Python and rerun install.sh." >&2; exit 1; }
 ".venv-tts/bin/python" -m pip install --upgrade pip
 ".venv-tts/bin/python" -m pip install -r requirements.txt
 echo "[4/7] Downloading Kokoro model and voice assets when missing..."
@@ -76,4 +77,5 @@ else
 fi
 echo
 echo "Setup complete. Launch RIKO with: bash run.sh"
+echo "Or launch the native desktop GUI with: bash run-gui.sh"
 echo "The project environment is .venv-tts; no shell activation is needed by run.sh."

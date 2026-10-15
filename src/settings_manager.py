@@ -13,6 +13,7 @@ from typing import Any
 
 DEFAULT_SETTINGS = {
     "persona": "assistant",
+    "profile": "user",
     "tts": {
         "engine": "kokoro",
         "voice": "af_sarah",
@@ -108,6 +109,18 @@ class SettingsManager:
         persona_id = self._validate_identifier(persona_id, "persona")
         settings = self.load()
         settings["persona"] = persona_id
+        self.save(settings)
+
+    def get_profile(self) -> str:
+        value = self.load().get("profile", "user")
+        if not isinstance(value, str) or not _IDENTIFIER.fullmatch(value):
+            return "user"
+        return value
+
+    def set_profile(self, profile_id: str) -> None:
+        profile_id = self._validate_identifier(profile_id, "profile")
+        settings = self.load()
+        settings["profile"] = profile_id
         self.save(settings)
 
     def get_tts_settings(self) -> dict[str, Any]:

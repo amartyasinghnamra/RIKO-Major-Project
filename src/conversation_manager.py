@@ -1,5 +1,7 @@
 """Conversation orchestration with streamed, model-selected tool calls."""
 
+import inspect
+import threading
 from time import perf_counter
 
 from src.debug_logger import log_event, log_exception
@@ -14,17 +16,70 @@ class ConversationManager:
         self.ollama_client = ollama_client
         self.enable_voice_status = False
         self.enable_text_status = False
+        self._response_lock = threading.Lock()
+        self._response_cancel_event = threading.Event()
+        self._response_active = False
         self.messages = [{
             "role": "system",
             "content": prompt_manager.build_prompt(mode=mode),
         }]
 
-    def _stream_and_record(self, messages):
+    def begin_response(self):
+        """Prepare a cancellable response before a UI enables its Stop button."""
+        with self._response_lock:
+            if not self._response_active:
+                self._response_cancel_event = threading.Event()
+                self._response_active = True
+            return self._response_cancel_event
+
+    def stop_response_generation(self) -> bool:
+        """Stop model generation and close any active Ollama stream."""
+        with self._response_lock:
+            if not self._response_active:
+                return False
+            cancel_event = self._response_cancel_event
+            cancel_event.set()
+
+        stop_client = getattr(self.ollama_client, "stop_response_generation", None)
+        if callable(stop_client):
+            stop_client()
+        return True
+
+    def _finish_response(self, cancel_event) -> None:
+        with self._response_lock:
+            if cancel_event is self._response_cancel_event:
+                self._response_active = False
+
+    @staticmethod
+    def _supports_cancel_event(method) -> bool:
+        try:
+            parameters = inspect.signature(method).parameters.values()
+        except (TypeError, ValueError):
+            return False
+        return any(
+            parameter.name == "cancel_event"
+            or parameter.kind == inspect.Parameter.VAR_KEYWORD
+            for parameter in parameters
+        )
+
+    def _client_stream(self, method, *args, cancel_event, **kwargs):
+        if self._supports_cancel_event(method):
+            kwargs["cancel_event"] = cancel_event
+        return method(*args, **kwargs)
+
+    def _stream_and_record(self, messages, cancel_event):
         parts = []
         started = perf_counter()
         log_event("LLM", "STREAM_STARTED", message_count=len(messages))
         try:
-            for chunk in self.ollama_client.stream_response(messages):
+            stream = self._client_stream(
+                self.ollama_client.stream_response,
+                messages,
+                cancel_event=cancel_event,
+            )
+            for chunk in stream:
+                if cancel_event.is_set():
+                    break
                 parts.append(chunk)
                 yield chunk
         except Exception as error:
@@ -32,7 +87,7 @@ class ConversationManager:
             raise
 
         complete = "".join(parts)
-        if complete:
+        if complete and not cancel_event.is_set():
             self.messages.append({"role": "assistant", "content": complete})
         log_event(
             "LLM", "STREAM_COMPLETED",
@@ -40,8 +95,10 @@ class ConversationManager:
             chunks=len(parts), characters=len(complete),
         )
 
-    def _execute_tool_calls(self, tool_calls):
+    def _execute_tool_calls(self, tool_calls, cancel_event=None):
         for call in tool_calls:
+            if cancel_event is not None and cancel_event.is_set():
+                return
             function = call.get("function", {}) if isinstance(call, dict) else {}
             name = function.get("name", "")
             arguments = function.get("arguments", {})
@@ -64,6 +121,9 @@ class ConversationManager:
                 log_exception("TOOLS", f"TOOL_EXECUTION_FAILED:{name}", error)
                 result = f"Tool execution failed ({type(error).__name__})."
 
+            if cancel_event is not None and cancel_event.is_set():
+                return
+
             log_event(
                 "TOOLS", "TOOL_EXECUTION_COMPLETED",
                 name=name or "unknown_tool",
@@ -74,6 +134,13 @@ class ConversationManager:
             self.messages.append({"role": "tool", "content": str(result)})
 
     def stream_response(self, user_message):
+        cancel_event = self.begin_response()
+        try:
+            yield from self._stream_response(user_message, cancel_event)
+        finally:
+            self._finish_response(cancel_event)
+
+    def _stream_response(self, user_message, cancel_event):
         self.messages.append({"role": "user", "content": user_message})
         log_event(
             "CONVERSATION", "USER_MESSAGE_RECEIVED",
@@ -84,10 +151,12 @@ class ConversationManager:
         if stream_events is None:
             # Compatibility path for existing test doubles or older clients.
             log_event("TOOLS", "STREAM_TOOL_API_UNAVAILABLE")
-            yield from self._stream_and_record(self.messages)
+            yield from self._stream_and_record(self.messages, cancel_event)
             return
 
         for round_number in range(1, MAX_TOOL_ROUNDS + 1):
+            if cancel_event.is_set():
+                return
             log_event(
                 "TOOLS", "TOOL_SELECTION_STARTED",
                 round=round_number,
@@ -96,10 +165,15 @@ class ConversationManager:
             tool_calls = []
 
             try:
-                for event in stream_events(
+                stream = self._client_stream(
+                    stream_events,
                     self.messages,
+                    cancel_event=cancel_event,
                     tools=[ARCHITECTURE_TOOL, CODEBASE_TOOL],
-                ):
+                )
+                for event in stream:
+                    if cancel_event.is_set():
+                        return
                     event_type = event.get("type")
                     if event_type == "content":
                         chunk = event.get("content", "")
@@ -123,6 +197,9 @@ class ConversationManager:
                 log_exception("TOOLS", "TOOL_SELECTION_FAILED", error)
                 raise
 
+            if cancel_event.is_set():
+                return
+
             if not tool_calls:
                 answer = "".join(assistant_parts)
                 if answer:
@@ -142,7 +219,9 @@ class ConversationManager:
                 "content": "".join(assistant_parts),
                 "tool_calls": tool_calls,
             })
-            self._execute_tool_calls(tool_calls)
+            self._execute_tool_calls(tool_calls, cancel_event)
+            if cancel_event.is_set():
+                return
             if self.enable_voice_status or self.enable_text_status:
                 yield (
                     "__RIKO_STATUS__",
@@ -155,4 +234,4 @@ class ConversationManager:
 
         log_event("TOOLS", "TOOL_ROUND_LIMIT_REACHED", limit=MAX_TOOL_ROUNDS)
         log_event("LLM", "FINAL_RESPONSE_STARTED")
-        yield from self._stream_and_record(self.messages)
+        yield from self._stream_and_record(self.messages, cancel_event)
