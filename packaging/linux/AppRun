@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+APP_DIR="${APPDIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
+BUNDLE_DIR="$APP_DIR/usr/share/riko"
+DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+APP_HOME="$DATA_HOME/RIKO"
+
+if [[ ! -d "$BUNDLE_DIR" ]]; then
+    echo "[RIKO] The AppImage payload is missing." >&2
+    exit 1
+fi
+mkdir -p "$APP_HOME"
+cp -a "$BUNDLE_DIR/." "$APP_HOME/"
+
+if [[ ! -f "$APP_HOME/.riko-setup-complete" ]]; then
+    SETUP_SCRIPT="$APP_HOME/riko-setup-and-run.sh"
+    if [[ -t 0 && -t 1 ]]; then
+        exec bash "$SETUP_SCRIPT" "$APP_HOME"
+    fi
+    if command -v x-terminal-emulator >/dev/null 2>&1; then
+        exec x-terminal-emulator -e bash "$SETUP_SCRIPT" "$APP_HOME"
+    fi
+    if command -v gnome-terminal >/dev/null 2>&1; then
+        exec gnome-terminal -- bash "$SETUP_SCRIPT" "$APP_HOME"
+    fi
+    echo "[RIKO] First-run setup needs a terminal. Launch this AppImage from a terminal." >&2
+    exit 1
+fi
+
+cd "$APP_HOME"
+exec bash run-gui.sh

@@ -35,7 +35,7 @@ if [[ ! -x .venv-tts/bin/python ]]; then python3 -m venv .venv-tts; else echo "R
 echo "[4/7] Downloading Kokoro model and voice assets when missing..."
 mkdir -p models/kokoro
 ensure_asset() {
-    local file="$1" url="$2" min_bytes="$3" part="$\{1}.part"
+    local file="$1" url="$2" min_bytes="$3" part="${1}.part"
     if [[ -e "$file" ]]; then
         local size
         size="$(stat -c %s -- "$file")"

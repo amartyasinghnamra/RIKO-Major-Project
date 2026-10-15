@@ -12,6 +12,11 @@
 .venv-tts/
 venv/
 
+# Native package build outputs
+/build/
+/Output/
+*.AppImage
+
 # Python cache and compiled files
 __pycache__/
 *.py[cod]

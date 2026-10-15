@@ -79,7 +79,7 @@ This is a conceptual overview; it does not imply that every path or feature is p
 
 The root-level installers create or reuse `.venv-tts`, install Python requirements, fetch Kokoro model and voice files, install or check Ollama, download `qwen3:4b-instruct`, warm the Faster-Whisper `base` cache, and start the separate profile setup if no personal profile exists. Profile setup asks for confirmation before saving. Valid existing model files and profiles are preserved.
 
-> **Linux download retry note:** If a Kokoro asset download fails, the current `install.sh` can leave a temporary file named `${1}.part` in the repository root. Remove that file before retrying the installer.
+> **Linux download retry note:** If a Kokoro asset download fails, `install.sh` preserves the partial file under `models/kokoro/` with a `.part` suffix. Inspect or remove that partial asset before retrying.
 
 ### Windows CMD
 
@@ -102,6 +102,13 @@ bash run.sh
 ```
 
 `install.sh` uses `sudo` to install apt packages, Tkinter, and Ollama. Other Linux distributions are not auto-configured; install Python 3.10+, venv/pip, Tkinter, a compiler toolchain, PortAudio, libsndfile, libespeak-ng, curl, and Ollama before adapting/running the script. The virtual environment is always project-local and `run.sh` invokes it without needing shell activation.
+
+### Graphical interface
+### Downloadable packages
+
+The `Build desktop packages` GitHub Actions workflow creates a Windows `RIKO-Setup.exe` installer and an x86_64 Linux AppImage. Download generated artifacts from a completed workflow run; release assets are not published automatically.
+
+Both packages download Python dependencies and model assets during setup rather than bundling the roughly 2 GB model payload. Windows installs RIKO per user and runs the existing setup script. On first launch, the AppImage copies the application files to `${XDG_DATA_HOME:-~/.local/share}/RIKO`, then opens a terminal for setup. Linux setup installs system prerequisites with `apt-get` and may request `sudo`; automatic setup supports Debian/Ubuntu. Internet access is required. The AppImage is an installer/launcher, not a fully self-contained offline runtime.
 
 ### Graphical interface
 

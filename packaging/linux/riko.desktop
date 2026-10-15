@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=RIKO
+Comment=Local-first AI companion
+Exec=AppRun
+Icon=riko
+Categories=Utility;
+Terminal=false

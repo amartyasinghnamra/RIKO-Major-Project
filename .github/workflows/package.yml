@@ -1,0 +1,56 @@
+name: Build desktop packages
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Stage clean source payload
+        run: python packaging/stage_project.py build/stage
+      - name: Install Inno Setup
+        shell: powershell
+        run: choco install innosetup --yes --no-progress
+      - name: Build installer
+        shell: powershell
+        env:
+          APP_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '0.0.0' }}
+          APP_SOURCE: ${{ github.workspace }}\build\stage
+          APP_OUTPUT: ${{ github.workspace }}\build\output
+        run: |
+          New-Item -ItemType Directory -Force build/output | Out-Null
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$env:APP_VERSION" "/DAppSource=$env:APP_SOURCE" "/O$env:APP_OUTPUT" packaging/windows/RIKO.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: riko-windows-installer
+          path: build/output/RIKO-Setup.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  linux-appimage:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install AppImage build prerequisites
+        shell: bash
+        run: sudo apt-get update && sudo apt-get install --yes desktop-file-utils librsvg2-bin
+      - name: Build AppImage
+        shell: bash
+        run: bash packaging/linux/build-appimage.sh build/output/RIKO-x86_64.AppImage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: riko-linux-appimage-x86_64
+          path: build/output/RIKO-x86_64.AppImage
+          if-no-files-found: error
+          retention-days: 14
