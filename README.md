@@ -42,6 +42,8 @@ RIKO ships as a **native desktop application** built with Python and Tkinter, wi
 - **Eleven configurable behaviour parameters.** Cuteness, playfulness, teasing, affection, energy, talkativeness, spontaneity, conversation initiative, emotional awareness, reassurance and response style, alongside response-style presets. These local preferences yield to the user's explicit instruction and serious tone.
 - **Personas and profiles.** Selectable persona documents and an editable private profile. A guided wizard runs during installation or on demand.
 - **Two bounded local tools.** An allow-listed architecture lookup that answers questions about RIKO's own documentation, and a read-only source explorer that lists and searches project text files.
+- **Visible tool lookups.** Architecture and codebase lookups appear as collapsed cards inside the assistant reply in both text and voice sessions. Expanding a card shows the query or pattern and the returned file paths.
+- **Chat alignment.** User messages appear on the left; wider assistant replies appear on the right.
 - **Optional speech cache.** Read aloud can reuse locally synthesised audio for repeated phrases. It is off by default, capped at 128 MB, and can be cleared in Preferences.
 - **Zoom.** The desktop interface scales from 80% to 160% using the controls beside the persona name, `Ctrl`/`Command` shortcuts, or `Ctrl`/`Command` plus the mouse wheel.
 - **Modular startup.** Text chat can be selected without importing voice-specific dependencies.
