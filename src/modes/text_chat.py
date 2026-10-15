@@ -66,6 +66,14 @@ class TextChatSession:
                         and chunk[0] == "__RIKO_STATUS__"
                     ):
                         print(f"\n[RIKO] {chunk[1]}", flush=True)
+                    elif (
+                        isinstance(chunk, tuple)
+                        and len(chunk) == 2
+                        and chunk[0] == "__RIKO_TOOL__"
+                    ):
+                        tool = chunk[1]
+                        name = tool.get("tool_name", "unknown_tool")
+                        print(f"\n[RIKO] Checking {name}…", flush=True)
                     else:
                         print(chunk, end="", flush=True)
                 print("\n")

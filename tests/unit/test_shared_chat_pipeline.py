@@ -6,6 +6,7 @@ import queue
 from threading import Event
 
 from GUI import app as gui_app
+from conversation_manager import ConversationManager
 from modes.text_chat import TextChatSession
 from modes.voice_chat import VoiceChatSession, is_stop_response_command
 from audio.stt import streaming_voice_input
@@ -51,6 +52,102 @@ def test_text_session_wraps_the_cli_conversation_stream():
     assert conversation.enable_text_status is True
     assert list(session.stream_response("hello")) == ["Reply to hello."]
     assert conversation.received == ["hello"]
+
+
+def test_architecture_tool_event_reaches_gui_text_event_queue(monkeypatch):
+    class ToolCallingClient:
+        def __init__(self):
+            self.calls = 0
+
+        def stream_chat_events(self, _messages, *, tools=None, cancel_event=None):
+            self.calls += 1
+            if self.calls == 1:
+                yield {
+                    "type": "tool_calls",
+                    "tool_calls": [{
+                        "function": {
+                            "name": "get_architecture_info",
+                            "arguments": {"topic": "modules", "detail": "full"},
+                        },
+                    }],
+                }
+            else:
+                yield {"type": "content", "content": "The modules are organized by responsibility."}
+
+    conversation = ConversationManager(FakePrompts(), ToolCallingClient())
+    session = TextChatSession(
+        prompt_manager=FakePrompts(),
+        ollama_client=object(),
+        conversation=conversation,
+    )
+    monkeypatch.setattr(
+        gui_app,
+        "run_text_chat",
+        lambda session, message: session.stream_response(message),
+    )
+    desktop = gui_app.RikoDesktop.__new__(gui_app.RikoDesktop)
+    desktop.text_session = session
+    desktop.events = queue.Queue()
+
+    streamed = list(desktop._response_tokens(conversation, "Explain the modules"))
+    queued = []
+    while not desktop.events.empty():
+        queued.append(desktop.events.get_nowait())
+
+    expected_tool_event = {
+        "tool_name": "get_architecture_info",
+        "arguments": {"topic": "modules", "detail": "full"},
+        "result_paths": ["knowledge/architecture/modules.md"],
+    }
+    assert ("tool_call", expected_tool_event) in queued
+    assert ("token", "The modules are organized by responsibility.") in queued
+    assert "The modules are organized by responsibility." in streamed
+    assert expected_tool_event not in streamed
+
+
+def test_voice_tool_event_reaches_host_but_not_kokoro_text():
+    tool_payload = {
+        "tool_name": "get_architecture_info",
+        "arguments": {"topic": "voice_pipeline"},
+        "result_paths": ["knowledge/architecture/voice_pipeline.md"],
+    }
+    emitted = []
+    spoken = []
+
+    class ToolConversation:
+        messages = [{"role": "system", "content": "old prompt"}]
+
+        def stream_response(self, _message):
+            yield ("__RIKO_TOOL__", tool_payload)
+            yield "Here is the voice pipeline."
+
+    class BargeInMonitor:
+        def __init__(self):
+            self.interrupted = Event()
+
+        def listen(self, _stop_event):
+            return None
+
+    class FakeTTS:
+        def speak_stream(self, tokens):
+            spoken.extend(token for token in tokens if isinstance(token, str))
+
+    session = VoiceChatSession.__new__(VoiceChatSession)
+    session.stop_event = Event()
+    session.conversation = ToolConversation()
+    session.prompt_manager = FakePrompts()
+    session.barge_in_monitor = BargeInMonitor()
+    session.tts = FakeTTS()
+    session._monitor_stop = None
+    session._emit_callback = lambda event, payload: emitted.append((event, payload))
+
+    session._respond_to("Explain voice mode", "Riko")
+
+    assert ("tool_call", tool_payload) in emitted
+    assert [payload for event, payload in emitted if event == "token"] == [
+        "Here is the voice pipeline."
+    ]
+    assert spoken == ["Here is the voice pipeline."]
 
 
 def test_voice_session_runs_original_stt_streaming_tts_and_barge_in_path():

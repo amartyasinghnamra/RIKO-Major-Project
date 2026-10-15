@@ -81,3 +81,46 @@ def test_stop_response_generation_stops_the_stream_and_discards_partial_history(
     assert collected == ["partial answer"]
     assert conversation.messages[-1] == {"role": "user", "content": "hello"}
     assert conversation.stop_response_generation() is False
+
+
+def test_tool_call_emits_structured_event_with_result_paths_and_final_text():
+    class ToolCallingClient:
+        def __init__(self):
+            self.calls = 0
+
+        def stream_chat_events(self, messages, *, tools=None, cancel_event=None):
+            self.calls += 1
+            if self.calls == 1:
+                yield {
+                    "type": "tool_calls",
+                    "tool_calls": [{
+                        "function": {
+                            "name": "get_architecture_info",
+                            "arguments": {"topic": "modules", "detail": "full"},
+                        },
+                    }],
+                }
+            else:
+                assert any(
+                    message.get("role") == "tool"
+                    and "knowledge/architecture/modules.md" in message.get("content", "")
+                    for message in messages
+                )
+                yield {"type": "content", "content": "Here is the architecture."}
+
+    conversation = ConversationManager(FakePromptManager(), ToolCallingClient())
+    events = list(conversation.stream_response("Explain the modules"))
+
+    tool_events = [
+        event[1]
+        for event in events
+        if isinstance(event, tuple)
+        and len(event) == 2
+        and event[0] == "__RIKO_TOOL__"
+    ]
+    assert tool_events == [{
+        "tool_name": "get_architecture_info",
+        "arguments": {"topic": "modules", "detail": "full"},
+        "result_paths": ["knowledge/architecture/modules.md"],
+    }]
+    assert "Here is the architecture." in events

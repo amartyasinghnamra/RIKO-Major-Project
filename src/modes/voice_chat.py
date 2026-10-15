@@ -203,6 +203,13 @@ class VoiceChatSession:
                         self._emit("status", str(chunk[1]))
                         yield chunk
                         continue
+                    if (
+                        isinstance(chunk, tuple)
+                        and len(chunk) == 2
+                        and chunk[0] == "__RIKO_TOOL__"
+                    ):
+                        self._emit("tool_call", chunk[1])
+                        continue
 
                     if not isinstance(chunk, str):
                         continue

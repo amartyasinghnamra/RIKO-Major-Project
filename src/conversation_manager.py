@@ -1,11 +1,17 @@
 """Conversation orchestration with streamed, model-selected tool calls."""
 
 import inspect
+import json
+import re
 import threading
 from time import perf_counter
 
 from src.debug_logger import log_event, log_exception
-from src.tools.architecture_tools import ARCHITECTURE_TOOL, execute_architecture_tool
+from src.tools.architecture_tools import (
+    ARCHITECTURE_TOOL,
+    TOPIC_FILES,
+    execute_architecture_tool,
+)
 from src.tools.codebase_explorer import CODEBASE_TOOL, execute_codebase_tool
 
 MAX_TOOL_ROUNDS = 4
@@ -66,6 +72,47 @@ class ConversationManager:
         if self._supports_cancel_event(method):
             kwargs["cancel_event"] = cancel_event
         return method(*args, **kwargs)
+
+    @staticmethod
+    def _tool_result_paths(name, arguments, result):
+        if isinstance(arguments, str):
+            try:
+                arguments = json.loads(arguments)
+            except json.JSONDecodeError:
+                arguments = {}
+        if not isinstance(arguments, dict):
+            arguments = {}
+
+        if name == "get_architecture_info":
+            topic = arguments.get("topic")
+            topic_file = TOPIC_FILES.get(topic)
+            if topic_file and not any(
+                marker in result
+                for marker in ("is missing", "Could not read")
+            ):
+                return [f"knowledge/architecture/{topic_file[0]}"]
+            return []
+
+        if name != "explore_codebase":
+            return []
+
+        operation = arguments.get("operation")
+        if operation == "read_file":
+            match = re.match(r"^Source: ([^\r\n]+)", result)
+            return [match.group(1)] if match else []
+        if operation == "list_files" and result.startswith("Project-relative files:\n"):
+            return [
+                line for line in result.splitlines()[1:]
+                if line and not line.startswith(("[", "("))
+            ]
+        if operation == "search_code":
+            paths = []
+            for line in result.splitlines():
+                match = re.match(r"^(.+?):\d+:\s", line)
+                if match and match.group(1) not in paths:
+                    paths.append(match.group(1))
+            return paths
+        return []
 
     def _stream_and_record(self, messages, cancel_event):
         parts = []
@@ -132,6 +179,18 @@ class ConversationManager:
             )
             # Ollama's chat API accepts tool results as tool-role messages.
             self.messages.append({"role": "tool", "content": str(result)})
+            yield (
+                "__RIKO_TOOL__",
+                {
+                    "tool_name": name or "unknown_tool",
+                    "arguments": arguments,
+                    "result_paths": self._tool_result_paths(
+                        name,
+                        arguments,
+                        str(result),
+                    ),
+                },
+            )
 
     def stream_response(self, user_message):
         cancel_event = self.begin_response()
@@ -219,7 +278,7 @@ class ConversationManager:
                 "content": "".join(assistant_parts),
                 "tool_calls": tool_calls,
             })
-            self._execute_tool_calls(tool_calls, cancel_event)
+            yield from self._execute_tool_calls(tool_calls, cancel_event)
             if cancel_event.is_set():
                 return
             if self.enable_voice_status or self.enable_text_status:
