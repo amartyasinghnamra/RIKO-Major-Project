@@ -70,6 +70,9 @@ class KokoroTTS:
         self._tts = None
         self._load_lock = threading.Lock()
         self._operation_lock = threading.Lock()
+        self._cancel_event = threading.Event()
+        # Signals that speak_stream owns the audio operation and may be monitored.
+        self._stream_active_event = threading.Event()
         self._playback = AudioPlayback()
 
     def load(self) -> None:
@@ -211,6 +214,8 @@ class KokoroTTS:
 
             try:
                 for token in token_iterator:
+                    if self._cancel_event.is_set():
+                        break
                     # A status event is spoken, but never included in
                     # the returned assistant response or conversation text.
                     if (
@@ -255,21 +260,29 @@ class KokoroTTS:
                 text_queue.put(_END)
 
         async def synthesize_phrase(text):
-            # Kokoro yields audio fragments while synthesizing this phrase.
+            # Stop queuing fragments as soon as cancellation is observed.
             async for samples, sample_rate in self._tts.create_stream(
                 text,
                 voice=self.voice,
                 speed=self.speed,
                 lang=self.lang,
             ):
+                if self._cancel_event.is_set():
+                    break
                 audio_queue.put((samples, sample_rate))
 
         def synthesize_audio():
             try:
-                while True:
-                    item = text_queue.get()
+                while not self._cancel_event.is_set():
+                    try:
+                        item = text_queue.get(timeout=0.1)
+                    except queue.Empty:
+                        continue
 
                     if item is _END:
+                        break
+
+                    if self._cancel_event.is_set():
                         break
 
                     asyncio.run(synthesize_phrase(item))
@@ -293,34 +306,56 @@ class KokoroTTS:
         last_sample_rate = 24000
         playback_error = None
 
+        # Tests and some lightweight callers may construct this object
+        # with __new__, bypassing __init__. Initialize the event if needed.
+        if not hasattr(self, "_cancel_event"):
+            self._cancel_event = threading.Event()
+        if not hasattr(self, "_stream_active_event"):
+            self._stream_active_event = threading.Event()
+
+        # Reset only after this operation owns the lock, so an active
+        # operation's cancellation cannot be accidentally cleared.
         with self._operation_lock:
+            self._cancel_event.clear()
+            self._stream_active_event.set()
             text_thread.start()
             tts_thread.start()
 
             try:
-                while True:
-                    item = audio_queue.get()
+                while not self._cancel_event.is_set():
+                    try:
+                        item = audio_queue.get(timeout=0.1)
+                    except queue.Empty:
+                        continue
 
                     if item is _END:
+                        break
+
+                    if self._cancel_event.is_set():
                         break
 
                     samples, sample_rate = item
                     last_sample_rate = sample_rate
                     self._playback.play_samples(samples, sample_rate)
 
-                # Let the final audio drain naturally.
-                self._playback.flush_tail(
-                    sample_rate=last_sample_rate,
-                    milliseconds=120,
-                )
+                # Drain naturally only when playback was not cancelled.
+                if not self._cancel_event.is_set():
+                    self._playback.flush_tail(
+                        sample_rate=last_sample_rate,
+                        milliseconds=120,
+                    )
 
             except Exception as exc:
                 playback_error = exc
+                self._cancel_event.set()
                 self._playback.stop()
 
             finally:
-                text_thread.join()
-                tts_thread.join()
+                # Workers are daemon threads; bounded joins prevent a
+                # stuck model/iterator from hanging the caller forever.
+                text_thread.join(timeout=1.0)
+                tts_thread.join(timeout=1.0)
+                self._stream_active_event.clear()
 
         if playback_error is not None:
             raise playback_error
@@ -331,5 +366,6 @@ class KokoroTTS:
         return "".join(full_text)
 
     def stop(self) -> None:
-        """Stop current audio playback."""
+        """Cancel pending playback and stop current audio."""
+        self._cancel_event.set()
         self._playback.stop()

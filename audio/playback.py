@@ -1,5 +1,5 @@
 
-"""Persistent audio output for RIKO."""
+"""Persistent, cancellable audio output for RIKO."""
 
 from pathlib import Path
 from threading import Lock
@@ -13,40 +13,47 @@ class AudioPlayback:
     def __init__(self, device=None):
         self.device = device
         self._lock = Lock()
+        self._state_lock = Lock()
         self._stream = None
         self._sample_rate = None
         self._channels = None
 
     def _ensure_stream(self, sample_rate, channels):
-        if (
-            self._stream is not None
-            and self._sample_rate == sample_rate
-            and self._channels == channels
-        ):
-            return
+        with self._state_lock:
+            if (
+                self._stream is not None
+                and self._sample_rate == sample_rate
+                and self._channels == channels
+            ):
+                return self._stream
 
-        self._close_stream()
+            self._close_stream_locked()
 
-        self._stream = sd.OutputStream(
-            samplerate=sample_rate,
-            channels=channels,
-            dtype="float32",
-            device=self.device,
-            latency="low",
-        )
-        self._stream.start()
-        self._sample_rate = sample_rate
-        self._channels = channels
+            stream = sd.OutputStream(
+                samplerate=sample_rate,
+                channels=channels,
+                dtype="float32",
+                device=self.device,
+                latency="low",
+            )
+            stream.start()
 
-    def _close_stream(self):
-        if self._stream is not None:
+            self._stream = stream
+            self._sample_rate = sample_rate
+            self._channels = channels
+            return stream
+
+    def _close_stream_locked(self):
+        stream = self._stream
+        self._stream = None
+        self._sample_rate = None
+        self._channels = None
+
+        if stream is not None:
             try:
-                self._stream.stop()
+                stream.stop()
             finally:
-                self._stream.close()
-                self._stream = None
-                self._sample_rate = None
-                self._channels = None
+                stream.close()
 
     def play_samples(self, samples, sample_rate: int) -> None:
         if sample_rate <= 0:
@@ -66,8 +73,8 @@ class AudioPlayback:
             raise ValueError("Audio must be mono or multichannel")
 
         with self._lock:
-            self._ensure_stream(sample_rate, audio.shape[1])
-            self._stream.write(audio)
+            stream = self._ensure_stream(sample_rate, audio.shape[1])
+            stream.write(audio)
 
     def play_file(self, file_path) -> None:
         path = Path(file_path)
@@ -82,13 +89,29 @@ class AudioPlayback:
         self.play_samples(samples, sample_rate)
 
     def flush_tail(self, sample_rate=24000, milliseconds=150):
-        """Give the final audio buffer time to drain naturally."""
         silence = np.zeros(
             int(sample_rate * milliseconds / 1000),
             dtype=np.float32,
         )
         self.play_samples(silence, sample_rate)
 
+
     def stop(self) -> None:
-        with self._lock:
-            self._close_stream()
+        # Detach the stream under the state lock, then stop it without
+        # waiting for the audio-write lock.
+        with self._state_lock:
+            stream = self._stream
+            self._stream = None
+            self._sample_rate = None
+            self._channels = None
+
+        if stream is not None:
+            try:
+                abort = getattr(stream, "abort", None)
+                if callable(abort):
+                    abort()
+                else:
+                    stream.stop()
+            finally:
+                with self._lock:
+                    stream.close()

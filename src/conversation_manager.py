@@ -3,7 +3,8 @@
 from time import perf_counter
 
 from src.debug_logger import log_event, log_exception
-from tools.architecture_tools import ARCHITECTURE_TOOL, execute_architecture_tool
+from src.tools.architecture_tools import ARCHITECTURE_TOOL, execute_architecture_tool
+from src.tools.codebase_explorer import CODEBASE_TOOL, execute_codebase_tool
 
 MAX_TOOL_ROUNDS = 4
 
@@ -12,6 +13,7 @@ class ConversationManager:
     def __init__(self, prompt_manager, ollama_client, mode="text"):
         self.ollama_client = ollama_client
         self.enable_voice_status = False
+        self.enable_text_status = False
         self.messages = [{
             "role": "system",
             "content": prompt_manager.build_prompt(mode=mode),
@@ -52,7 +54,12 @@ class ConversationManager:
             started = perf_counter()
             log_event("TOOLS", "TOOL_EXECUTION_STARTED", name=name)
             try:
-                result = execute_architecture_tool(name, arguments)
+                if name == "get_architecture_info":
+                    result = execute_architecture_tool(name, arguments)
+                elif name == "explore_codebase":
+                    result = execute_codebase_tool(name, arguments)
+                else:
+                    result = f"Tool '{name or 'unknown_tool'}' is not available."
             except Exception as error:
                 log_exception("TOOLS", f"TOOL_EXECUTION_FAILED:{name}", error)
                 result = f"Tool execution failed ({type(error).__name__})."
@@ -81,9 +88,6 @@ class ConversationManager:
             return
 
         for round_number in range(1, MAX_TOOL_ROUNDS + 1):
-            if self.enable_voice_status and round_number == 1:
-                yield ("__RIKO_STATUS__", "Hmm, let me think for a moment.")
-
             log_event(
                 "TOOLS", "TOOL_SELECTION_STARTED",
                 round=round_number,
@@ -94,7 +98,7 @@ class ConversationManager:
             try:
                 for event in stream_events(
                     self.messages,
-                    tools=[ARCHITECTURE_TOOL],
+                    tools=[ARCHITECTURE_TOOL, CODEBASE_TOOL],
                 ):
                     event_type = event.get("type")
                     if event_type == "content":
@@ -104,7 +108,7 @@ class ConversationManager:
                             yield chunk
                     elif event_type == "tool_calls":
                         tool_calls = event.get("tool_calls") or []
-                        if self.enable_voice_status and tool_calls:
+                        if (self.enable_voice_status or self.enable_text_status) and tool_calls:
                             yield (
                                 "__RIKO_STATUS__",
                                 "One moment, let me check that for you.",
@@ -139,7 +143,7 @@ class ConversationManager:
                 "tool_calls": tool_calls,
             })
             self._execute_tool_calls(tool_calls)
-            if self.enable_voice_status:
+            if self.enable_voice_status or self.enable_text_status:
                 yield (
                     "__RIKO_STATUS__",
                     "Got it. Let me put that together for you.",

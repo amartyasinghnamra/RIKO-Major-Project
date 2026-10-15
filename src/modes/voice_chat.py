@@ -19,6 +19,7 @@ from ollama_client import OllamaClient
 from conversation_manager import ConversationManager
 from audio.kokoro.tts import KokoroTTS
 from audio.stt.streaming_voice_input import StreamingVoiceInput
+from audio.stt.barge_in_monitor import BargeInMonitor
 
 
 def main():
@@ -82,7 +83,17 @@ def main():
             update_interval=0.8,
             window_seconds=6.0,
         )
+        barge_in_monitor = BargeInMonitor(
+            stt=voice_input.stt,
+            tts=tts,
+            microphone_device=voice_input.microphone_device,
+            energy_threshold=0.025,
+            confirmation_seconds=0.30,
+            silence_duration=0.8,
+            max_record_seconds=15.0,
+        )
         print("[RIKO] Microphone input is ready.")
+        print("[RIKO] Barge-in is enabled; headphones are recommended to reduce speaker echo.")
     except Exception as error:
         print(f"[RIKO] Could not initialize microphone STT: {error}")
         tts.stop()
@@ -92,10 +103,17 @@ def main():
     print("[RIKO] Voice Chat active. Speak naturally.")
     print("[RIKO] Press Ctrl+C to end the conversation.\n")
 
+    pending_user_message = None
+
     try:
         while True:
             try:
-                user_message = voice_input.listen_once()
+                if pending_user_message:
+                    user_message = pending_user_message
+                    pending_user_message = None
+                    print(f"\n[You said - barge-in] {user_message}")
+                else:
+                    user_message = voice_input.listen_once()
             except KeyboardInterrupt:
                 print(f"\n\n{riko_name}: See you later!")
                 break
@@ -157,6 +175,22 @@ def main():
                     print(chunk, end="", flush=True)
                     yield chunk
 
+            monitor_stop = Event()
+            monitor_result = {"text": None}
+
+            def monitor_for_barge_in():
+                try:
+                    monitor_result["text"] = barge_in_monitor.listen(monitor_stop)
+                except Exception as error:
+                    log_exception("VOICE", "Barge-in monitor failed", error)
+
+            monitor_thread = Thread(
+                target=monitor_for_barge_in,
+                name="riko-barge-in-monitor",
+                daemon=True,
+            )
+            monitor_thread.start()
+
             try:
                 tts.speak_stream(visible_text_stream())
                 elapsed = perf_counter() - started
@@ -170,6 +204,26 @@ def main():
                 break
             except Exception as error:
                 log_exception("VOICE", "Voice response failed", error)
+            finally:
+                if barge_in_monitor.interrupted.is_set():
+                    # Once interrupted, let the monitor finish collecting the utterance.
+                    monitor_thread.join(timeout=25.0)
+                else:
+                    monitor_stop.set()
+                    monitor_thread.join(timeout=2.0)
+
+                if monitor_thread.is_alive():
+                    monitor_stop.set()
+                    monitor_thread.join(timeout=1.0)
+
+                transcript = monitor_result.get("text")
+                if transcript and transcript.strip():
+                    pending_user_message = transcript.strip()
+                    log_event(
+                        "VOICE",
+                        "Barge-in transcript ready",
+                        transcript_chars=len(pending_user_message),
+                    )
 
     finally:
         tts.stop()

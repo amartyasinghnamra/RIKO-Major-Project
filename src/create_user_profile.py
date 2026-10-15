@@ -11,22 +11,11 @@ PROFILE_PATH = (
 
 DEFAULT_PROFILE = {
     "identity": {
-        "preferred_name": "User",
-        "role": "Student"
+        "preferred_name": "",
+        "role": ""
     },
-    "interests": [
-        "Artificial Intelligence",
-        "Machine Learning",
-        "Linux",
-        "Operating Systems",
-        "Anime",
-        "AI companion development"
-    ],
-    "current_goals": [
-        "Prepare for GATE DA 2027",
-        "Develop the RIKO major project",
-        "Improve programming fundamentals"
-    ],
+    "interests": [],
+    "current_goals": [],
     "learning_preferences": {
         "explanation_style": "step-by-step, beginner-friendly",
         "pace": "slow and understandable",

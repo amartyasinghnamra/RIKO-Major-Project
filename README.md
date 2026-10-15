@@ -65,66 +65,34 @@ This is a conceptual overview; it does not imply that every path or feature is p
 
 ## Requirements
 
-- Windows is the current documented development environment.
-- A Python version compatible with the project's dependencies.
-- Ollama installed and running locally.
-- The `qwen3:4b-instruct` model downloaded into Ollama.
-- Kokoro ONNX model and voice assets for Voice Chat.
-- A working microphone and audio output device for live voice interaction.
-- Faster-Whisper and its runtime dependencies for speech recognition.
+- Windows 10 or newer with CMD, Git, `curl.exe`, and Python 3.10 or newer on `PATH` (Python 3.11 or newer is recommended).
+- Ollama for Windows installed and available on `PATH`. The installer downloads `qwen3:4b-instruct` into Ollama.
+- Internet access and enough free disk space for the Python environment, Ollama model, Kokoro files (about 120 MB combined), and Faster-Whisper model cache.
+- A working microphone and audio output device for live Voice Chat.
 
 ## Installation (Windows CMD)
 
-### 1. Clone the repository
+### 1. Clone and install
 
 ```bat
-git clone https://github.com/amartyasinghnamra/RIKO-Major-Project.git
-cd RIKO-Major-Project
-```
-
-### 2. Create and activate a virtual environment
-
-```bat
-python -m venv .venv-tts
-.venv-tts\Scripts\activate
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-If Faster-Whisper is not included in the installed dependency list, install it separately:
-
-```bat
-python -m pip install faster-whisper
-```
-
-### 3. Set up Ollama
-
-Install Ollama and make sure its local service is running. Then run:
-
-```bat
-ollama pull qwen3:4b-instruct
-ollama list
-```
-
-### 4. Add Kokoro model assets
-
-Place the required assets in `models/kokoro/`:
-
-```text
-models/kokoro/
-├── kokoro-v1.0.int8.onnx
-└── voices-v1.0.bin
-```
-
-Model weights are not committed to this repository. Obtain them from a trusted source and review the applicable model and voice licences.
-
-### 5. Launch RIKO
-
-From the repository root, with the virtual environment active:
-
-```bat
+git clone https://github.com/amartyasinghnamra/RIKO-Major-Project.git RIKO_PROJECT
+cd RIKO_PROJECT
+install.bat
 python src\main.py
 ```
+
+Run these commands in a new CMD window. Install Git, Python, and Ollama first if they are missing. During Python setup, enable **Add python.exe to PATH**. After installing Ollama, open a new CMD window so its PATH entry is available.
+
+`install.bat` creates or reuses `.venv-tts`, installs `requirements.txt`, downloads missing Kokoro assets into `models\kokoro\`, offers the interactive user-profile setup on first install, pulls Ollama's `qwen3:4b-instruct` model, and downloads or verifies the Faster-Whisper `base` model cache. The profile is saved to the ignored `config\local\user_profile.json`; an existing profile is left unchanged. If you decline to save it during installation, you can run `python src\create_user_profile.py` later. The installer then activates `.venv-tts` in the current CMD session. Re-running it reuses the environment and cached models; existing Kokoro files are preserved and checked before use. Downloads require an internet connection.
+
+If CMD does not show `(.venv-tts)` after setup (for example, if another batch file invoked the installer), activate the environment before launching:
+
+```bat
+call .venv-tts\Scripts\activate.bat
+python src\main.py
+```
+
+The installer downloads Kokoro v1.0 INT8 model and voice assets from the [`kokoro-onnx` v1.0 model release](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0). These model files are ignored by Git and are not added to the repository. Review the upstream model and voice terms before redistribution.
 
 The menu offers:
 
@@ -132,7 +100,7 @@ The menu offers:
 - `2` — Voice Chat
 - `0` — Exit
 
-Text Chat requires a working local Ollama setup and project configuration. Voice Chat additionally requires the speech/audio dependencies, model assets, microphone, and audio output device.
+Text Chat requires the local Ollama service and downloaded chat model. Voice Chat additionally requires the speech/audio packages and model assets installed by `install.bat`, plus a microphone and audio output device. Faster-Whisper may use additional model cache space on its first load if the cache was cleared.
 
 ## Development and Testing
 
@@ -188,6 +156,7 @@ RIKO-Major-Project/
 │   ├── integration/
 │   └── audio/
 ├── requirements.txt
+├── install.bat
 ├── .gitignore
 └── README.md
 ```

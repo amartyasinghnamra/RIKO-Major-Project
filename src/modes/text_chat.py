@@ -23,6 +23,8 @@ def main():
         ollama_client,
     )
 
+    conversation.enable_text_status = True
+
     persona = prompt_manager.get_persona()
     riko_name = persona.get("name") or "Riko"
 
@@ -47,7 +49,14 @@ def main():
 
         try:
             for chunk in conversation.stream_response(user_message):
-                print(chunk, end="", flush=True)
+                if (
+                    isinstance(chunk, tuple)
+                    and len(chunk) == 2
+                    and chunk[0] == "__RIKO_STATUS__"
+                ):
+                    print(f"\n[RIKO] {chunk[1]}", flush=True)
+                else:
+                    print(chunk, end="", flush=True)
             print("\n")
         except Exception as error:
             print(f"\n[RIKO error] {error}\n")
