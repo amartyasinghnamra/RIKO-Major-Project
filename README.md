@@ -33,7 +33,7 @@ RIKO ships as a **native desktop application** built with Python and Tkinter, wi
 - **Local language model.** Connects to a locally running Ollama service and uses `qwen3:4b-instruct`. No hosted LLM API is configured in the default setup.
 - **Streaming replies.** Model output is consumed as a stream of chunks, not waited for in full.
 - **Speech recognition.** Microphone capture and a Faster-Whisper speech-to-text pipeline running on the CPU in int8 mode.
-- **Speech synthesis.** Kokoro ONNX for local text-to-speech, with streaming playback.
+- **Speech synthesis.** Kokoro ONNX for local text-to-speech, with streaming playback. The bundled voice is `af_sarah`, synthesised at 24 kHz.
 - **Hands-free voice mode.** Select **Voice** to start listening; select **Chat** to stop listening and playback. Markdown markers are stripped before speech so that characters such as `**` are never spoken.
 - **Text chat actions.** Every assistant reply offers **Regenerate** and **Read aloud**. Read aloud uses Kokoro and is never automatic.
 - **Manual dictation.** A microphone control beside **Send** records up to two minutes, renders rolling Faster-Whisper drafts in the composer, and finalises the transcript there for review before sending.
@@ -104,7 +104,7 @@ The text path runs without initialising any audio device.
 4. Faster-Whisper transcribes the collected audio on the CPU in int8 mode, with automatic language detection.
 5. The transcript is passed to the shared `ConversationManager`, which is the same component the text path uses.
 6. Ollama generates the reply using the same prompt assembly.
-7. The cleaned text is synthesised by Kokoro ONNX in chunks and played as it is produced, so playback begins before the reply is complete.
+7. The cleaned text is synthesised by Kokoro ONNX in chunks at 24 kHz and played as it is produced, so playback begins before the reply is complete.
 8. The barge-in monitor may capture a new utterance during playback and queue it for the next turn.
 
 ---
@@ -210,7 +210,7 @@ The Linux installer uses `sudo` (or root) with `apt-get` and configures **Debian
 
 ### Downloadable packages
 
-The `Build desktop packages` GitHub Actions workflow creates a Windows `RIKO-Setup.exe` installer and an x86_64 Linux AppImage. Push a `v*` tag to build both packages and automatically publish a GitHub Release with the installers attached. Builds triggered by pushes to `main` or manual workflow runs are available as Actions artifacts for 14 days.
+The `Build desktop packages` GitHub Actions workflow creates a Windows `RIKO-Setup.exe` installer (built with Inno Setup) and an x86_64 Linux AppImage. Push a `v*` tag to build both packages and automatically publish a GitHub Release with the installers attached. Builds triggered by pushes to `main` or manual workflow runs are available as Actions artifacts for 14 days.
 
 Both packages download Python dependencies and model assets during setup rather than bundling them. Windows installs RIKO per user and runs the existing setup script. Its Desktop and Start Menu shortcuts launch the GUI directly without opening a console. The AppImage copies RIKO to `${XDG_DATA_HOME:-~/.local/share}/RIKO` and creates Desktop and application-menu launchers for future GUI-only launches. Its first launch opens a terminal for setup. Linux setup installs system prerequisites with `apt-get` and may request `sudo`; automatic setup supports Debian/Ubuntu. Internet access is required. The AppImage is an installer/launcher, not a fully self-contained offline runtime.
 
