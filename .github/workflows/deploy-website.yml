@@ -1,0 +1,50 @@
+# Builds the RIKO website (Vite) and publishes it to GitHub Pages.
+# One-time setup: repo Settings -> Pages -> Source = "GitHub Actions".
+name: Deploy website to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Riko_WEbsite/**'
+      - '.github/workflows/deploy-website.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Riko_WEbsite
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Build
+        # base must match the GitHub Pages project path so asset URLs resolve
+        run: npm run build -- --base=/RIKO-Major-Project/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: Riko_WEbsite/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
