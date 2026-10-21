@@ -31,7 +31,8 @@ jobs:
         with:
           node-version: 20
       - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+        # note: npm install (not npm ci) because the repo has no package-lock.json
+        run: npm install --no-audit --no-fund
       - name: Build
         # base must match the GitHub Pages project path so asset URLs resolve
         run: npm run build -- --base=/RIKO-Major-Project/
