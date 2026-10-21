@@ -1,0 +1,897 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RIKO — A Local AI Companion</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="site-header">
+        <a class="brand" href="#top" aria-label="RIKO home"
+          ><span class="brand-mark">R</span
+          ><span>RIKO<span class="brand-dot">.</span></span></a
+        ><button
+          class="menu-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="primary-nav"
+        >
+          Menu <span aria-hidden="true">☰</span>
+        </button>
+        <nav id="primary-nav" class="primary-nav" aria-label="Main navigation">
+          <a href="#features">Features</a
+          ><a href="#how-it-works">How it works</a
+          ><a href="#screenshots">Screenshots</a
+          ><a href="#requirements">Requirements</a><a href="#status">Status</a>
+        </nav>
+        <a class="nav-cta" href="#install"
+          >Get RIKO <span aria-hidden="true">↗</span></a
+        >
+      </header>
+      <main id="top">
+        <section class="hero section-wrap">
+          <div class="hero-copy">
+            <div class="eyebrow">
+              <span class="status-pulse"></span> LOCAL-FIRST AI COMPANION
+            </div>
+            <h1>
+              Meet RIKO.<br /><span>Your space,</span><br />your conversation.
+            </h1>
+            <p class="hero-lead">
+              RIKO is a modular, local-first AI companion for text and voice
+              interaction. It runs a language model, speech recognition and
+              speech synthesis on your own machine, so conversations are not
+              sent to a hosted model service in the default setup.
+            </p>
+            <div class="hero-actions">
+              <a class="button button-primary" href="#install"
+                >Get started <span aria-hidden="true">↗</span></a
+              ><a
+                class="button button-quiet"
+                href="https://github.com/amartyasinghnamra/RIKO-Major-Project"
+                target="_blank"
+                rel="noreferrer"
+                >Explore the code <span aria-hidden="true">↗</span></a
+              >
+            </div>
+            <div class="hero-meta">
+              <span><i></i> Windows + Linux</span
+              ><span><i></i> Python · Tkinter</span
+              ><span><i></i> Local model inference</span>
+            </div>
+          </div>
+          <div
+            class="terminal-frame"
+            aria-label="Illustration of a RIKO terminal session"
+          >
+            <div class="terminal-top">
+              <div class="window-dots">
+                <span></span><span></span><span></span>
+              </div>
+              <span class="terminal-label">riko — local session</span
+              ><span class="terminal-live"><b></b> LOCAL</span>
+            </div>
+            <div class="terminal-content">
+              <div class="terminal-line terminal-muted">
+                RIKO / interactive session
+              </div>
+              <div class="terminal-line terminal-gap">
+                <span class="prompt">›</span>
+                <span class="terminal-command">riko</span>
+              </div>
+              <div class="terminal-line terminal-muted">
+                Select a mode to continue
+              </div>
+              <div class="terminal-option">
+                <span class="option-number">01</span><span>Text Chat</span
+                ><span class="option-arrow">↗</span>
+              </div>
+              <div class="terminal-option terminal-option-active">
+                <span class="option-number">02</span><span>Voice Chat</span
+                ><span class="option-tag">READY</span>
+              </div>
+              <div class="terminal-option">
+                <span class="option-number">03</span
+                ><span>Settings &amp; Selectors</span
+                ><span class="option-arrow">↗</span>
+              </div>
+              <div class="terminal-option">
+                <span class="option-number">04</span><span>Exit</span
+                ><span class="option-arrow">↗</span>
+              </div>
+              <div class="terminal-divider"></div>
+              <div class="terminal-line terminal-muted">
+                Model <span class="terminal-value">qwen3:4b-instruct</span>
+              </div>
+              <div class="terminal-line terminal-muted">
+                Speech
+                <span class="terminal-value">Kokoro · Faster-Whisper</span>
+              </div>
+              <div class="terminal-line terminal-ready">
+                <span class="prompt">●</span> Ready when you are<span
+                  class="cursor"
+                ></span>
+              </div>
+            </div>
+            <div class="terminal-bottom">
+              <span>127.0.0.1 · LOCAL RUNTIME</span><span>SESSION 001</span>
+            </div>
+          </div>
+        </section>
+        <section class="trust-strip">
+          <div class="trust-inner">
+            <span>BUILT FOR PERSONAL COMPUTING</span>
+            <div><b>01</b> Native desktop</div>
+            <div><b>02</b> Local-first models</div>
+            <div><b>03</b> Text + voice</div>
+            <div><b>04</b> Open source</div>
+          </div>
+        </section>
+        <section id="features" class="section-wrap section-block">
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">CAPABILITIES</div>
+              <h2>A companion, built <span>around you.</span></h2>
+            </div>
+            <p>
+              One shared engine, two ways to talk, and controls that keep the
+              experience yours.
+            </p>
+          </div>
+          <div class="feature-grid">
+            <article class="feature-card feature-card-large">
+              <div class="feature-icon icon-lilac">◈</div>
+              <div class="feature-kicker">01 / NATIVE BY DESIGN</div>
+              <h3>A real desktop app.</h3>
+              <p>
+                Built with Python and Tkinter—not a browser wrapper. The GUI and
+                terminal mode share the same chat sessions and audio pipeline
+                across Windows and Linux.
+              </p>
+              <div class="feature-foot">
+                <span>TKINTER CANVAS</span><span>↗</span>
+              </div>
+            </article>
+            <article class="feature-card">
+              <div class="feature-icon icon-mint">⌘</div>
+              <div class="feature-kicker">02 / LOCAL INFERENCE</div>
+              <h3>Your machine, your models.</h3>
+              <p>
+                Ollama runs <code>qwen3:4b-instruct</code> locally. Default
+                setup does not configure a hosted LLM API.
+              </p>
+              <div class="feature-foot"><span>OLLAMA</span><span>↗</span></div>
+            </article>
+            <article class="feature-card">
+              <div class="feature-icon icon-peach">♫</div>
+              <div class="feature-kicker">03 / VOICE PIPELINE</div>
+              <h3>Listen and speak.</h3>
+              <p>
+                Faster-Whisper transcribes microphone input and Kokoro
+                synthesises replies, with hands-free voice mode and
+                user-triggered Read aloud.
+              </p>
+              <div class="feature-foot">
+                <span>STT + TTS</span><span>↗</span>
+              </div>
+            </article>
+            <article class="feature-card">
+              <div class="feature-icon icon-blue">⌁</div>
+              <div class="feature-kicker">04 / PERSONAL CONTROL</div>
+              <h3>Make it feel like RIKO.</h3>
+              <p>
+                Choose personas, local profile context, Kokoro voice and speed,
+                plus adjustable behaviour and response-style presets.
+              </p>
+              <div class="feature-foot">
+                <span>LOCAL PREFERENCES</span><span>↗</span>
+              </div>
+            </article>
+            <article class="feature-card">
+              <div class="feature-icon icon-yellow">↗</div>
+              <div class="feature-kicker">05 / VISIBLE ACTIONS</div>
+              <h3>Useful tools, not mystery.</h3>
+              <p>
+                Bounded architecture and source lookups appear as compact,
+                expandable blocks inside replies instead of masquerading as the
+                assistant's answer.
+              </p>
+              <div class="feature-foot">
+                <span>READ-ONLY EXPLORER</span><span>↗</span>
+              </div>
+            </article>
+            <article class="feature-card">
+              <div class="feature-icon icon-lilac">◷</div>
+              <div class="feature-kicker">06 / BUILT FOR FLOW</div>
+              <h3>Stay in control.</h3>
+              <p>
+                Streamed Markdown replies, Regenerate, Stop/Escape, reviewed
+                dictation drafts and zoom from 80% to 160% in the desktop app.
+              </p>
+              <div class="feature-foot">
+                <span>YOU SET THE PACE</span><span>↗</span>
+              </div>
+            </article>
+          </div>
+        </section>
+        <section id="how-it-works" class="how-section">
+          <div class="section-wrap section-block">
+            <div class="section-heading">
+              <div>
+                <div class="eyebrow">UNDER THE HOOD</div>
+                <h2>One turn. <span>Local all the way.</span></h2>
+              </div>
+              <p>
+                The same conversation manager powers text and voice, with
+                separate local model and audio components.
+              </p>
+            </div>
+            <div class="flow-layout">
+              <div class="flow-steps">
+                <article class="flow-step">
+                  <span class="step-no">01</span>
+                  <div>
+                    <h3>Input</h3>
+                    <p>
+                      Type in the desktop chat, or use the microphone for a
+                      reviewed transcription or hands-free voice session.
+                    </p>
+                  </div>
+                  <span class="step-tech">TKINTER / FASTER-WHISPER</span>
+                </article>
+                <article class="flow-step">
+                  <span class="step-no">02</span>
+                  <div>
+                    <h3>Understand &amp; respond</h3>
+                    <p>
+                      PromptManager assembles persona, local preferences and
+                      available profile context. Ollama streams the model reply.
+                    </p>
+                  </div>
+                  <span class="step-tech">PROMPT MANAGER / OLLAMA</span>
+                </article>
+                <article class="flow-step">
+                  <span class="step-no">03</span>
+                  <div>
+                    <h3>Speak, if you choose</h3>
+                    <p>
+                      Cleaned reply text can go to Kokoro for speech. Read aloud
+                      is user-triggered; hands-free mode uses streaming
+                      synthesis.
+                    </p>
+                  </div>
+                  <span class="step-tech">KOKORO ONNX</span>
+                </article>
+              </div>
+              <div class="architecture-card">
+                <div class="architecture-head">
+                  <span>RIKO / SYSTEM MAP</span
+                  ><span class="live-pill"><i></i> LOCAL PATH</span>
+                </div>
+                <div class="architecture-node">
+                  <span class="node-symbol">▣</span>
+                  <div><b>Desktop GUI</b><small>Python · Tkinter</small></div>
+                  <span class="node-side">01</span>
+                </div>
+                <div class="connector"><span></span></div>
+                <div class="architecture-node">
+                  <span class="node-symbol">⌘</span>
+                  <div>
+                    <b>Conversation Manager</b
+                    ><small>Shared text + voice sessions</small>
+                  </div>
+                  <span class="node-side">02</span>
+                </div>
+                <div class="connector"><span></span></div>
+                <div class="architecture-split">
+                  <div class="architecture-node">
+                    <span class="node-symbol">◉</span>
+                    <div><b>Ollama</b><small>Local LLM</small></div>
+                  </div>
+                  <div class="architecture-node">
+                    <span class="node-symbol">♫</span>
+                    <div><b>Voice pipeline</b><small>STT → TTS</small></div>
+                  </div>
+                </div>
+                <div class="architecture-note">
+                  <span>i</span>
+                  <p>
+                    Local-first does not mean offline installation. Dependencies
+                    and model assets are downloaded during setup.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section
+          id="screenshots"
+          class="section-wrap section-block screenshots-section"
+        >
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">A CLOSER LOOK</div>
+              <h2>See RIKO <span>in action.</span></h2>
+            </div>
+            <p>
+              Real screenshots from RIKO's desktop app, showing the text-chat interface and the voice-chat experience.
+            </p>
+          </div>
+          <div class="screenshot-grid">
+            <figure class="screenshot-card">
+              <div
+                class="screenshot-placeholder screenshot-text screenshot-real screenshot-real-text"
+                role="img"
+                aria-label="Real screenshot of RIKO desktop text chat with streaming assistant replies and local runtime controls"
+              >
+                <div class="placeholder-window">
+                  <div class="placeholder-bar">
+                    <span></span><span></span><span></span><b>RIKO / CHAT</b>
+                  </div>
+                  <div class="placeholder-chat">
+                    <div class="placeholder-bubble user-bubble"></div>
+                    <div class="placeholder-bubble reply-bubble">
+                      <i></i><i></i><i></i>
+                    </div>
+                    <div
+                      class="placeholder-bubble user-bubble short-bubble"
+                    ></div>
+                    <div class="placeholder-bubble reply-bubble">
+                      <i></i><i></i>
+                    </div>
+                  </div>
+                  <div class="placeholder-composer">
+                    <span>Message RIKO…</span><b>↑</b>
+                  </div>
+                </div>
+                <span class="placeholder-label"
+                  >RIKO / REAL DESKTOP SCREENSHOT</span
+                >
+              </div>
+              <figcaption>
+                <span>01 / TEXT</span
+                ><strong
+                  >Text chat — a streaming reply from the local model</strong
+                >
+              </figcaption>
+            </figure>
+            <figure class="screenshot-card">
+              <div
+                class="screenshot-placeholder screenshot-voice screenshot-real screenshot-real-voice"
+                role="img"
+                aria-label="Real screenshot of RIKO desktop voice chat with microphone listening and spoken response controls"
+              >
+                <div class="placeholder-window voice-window">
+                  <div class="placeholder-bar">
+                    <span></span><span></span><span></span><b>RIKO / VOICE</b>
+                  </div>
+                  <div class="voice-visual">
+                    <div class="voice-orbit orbit-one"></div>
+                    <div class="voice-orbit orbit-two"></div>
+                    <div class="voice-core">R</div>
+                  </div>
+                  <div class="voice-wave">
+                    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i
+                    ><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i
+                    ><i></i>
+                  </div>
+                  <div class="voice-status">
+                    <span></span> LISTENING / PROTOTYPE
+                  </div>
+                </div>
+                <span class="placeholder-label"
+                  >RIKO / REAL DESKTOP SCREENSHOT</span
+                >
+              </div>
+              <figcaption>
+                <span>02 / VOICE</span
+                ><strong>Voice chat — microphone in, Kokoro speech out</strong>
+              </figcaption>
+            </figure>
+          </div>
+        </section>
+        <section id="install" class="install-section">
+          <div class="section-wrap section-block">
+            <div class="section-heading">
+              <div>
+                <div class="eyebrow">GET STARTED</div>
+                <h2>Choose your <span>path.</span></h2>
+              </div>
+              <p>
+                Download a packaged setup installer or clone the source and run
+                the repository-root scripts.
+              </p>
+            </div>
+            <div class="install-tabs">
+              <article class="install-card install-release">
+                <div class="install-card-top">
+                  <span class="install-label">QUICK START</span
+                  ><span class="install-number">01</span>
+                </div>
+                <h3>Packaged downloads</h3>
+                <p>
+                  Get the published Windows setup installer or Linux AppImage
+                  from GitHub Releases. Both download dependencies and models
+                  during setup; they are not offline bundles.
+                </p>
+                <a
+                  class="button button-primary"
+                  href="https://github.com/amartyasinghnamra/RIKO-Major-Project/releases"
+                  target="_blank"
+                  rel="noreferrer"
+                  >Open GitHub Releases <span aria-hidden="true">↗</span></a
+                >
+                <div class="platform-pills">
+                  <span>Windows · RIKO-Setup.exe</span
+                  ><span>Linux · x86_64 AppImage</span>
+                </div>
+                <p class="fine-print">
+                  GitHub Actions workflow artifacts are temporary build outputs,
+                  not published release downloads.
+                </p>
+              </article>
+              <article class="install-card install-source">
+                <div class="install-card-top">
+                  <span class="install-label">FROM SOURCE</span
+                  ><span class="install-number">02</span>
+                </div>
+                <h3>Clone and run</h3>
+                <p>
+                  Commands below start from the repository root. No extra
+                  project subdirectory is needed.
+                </p>
+                <div class="code-panel">
+                  <div class="code-panel-head">
+                    <span>WINDOWS CMD</span
+                    ><button
+                      class="copy-code"
+                      type="button"
+                      data-copy="windows-commands"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <pre
+                    id="windows-commands"
+                  ><code>git clone https://github.com/amartyasinghnamra/RIKO-Major-Project.git
+cd RIKO-Major-Project
+install.bat
+run.bat</code></pre>
+                </div>
+                <div class="code-panel">
+                  <div class="code-panel-head">
+                    <span>LINUX · DEBIAN / UBUNTU</span
+                    ><button
+                      class="copy-code"
+                      type="button"
+                      data-copy="linux-commands"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <pre
+                    id="linux-commands"
+                  ><code>git clone https://github.com/amartyasinghnamra/RIKO-Major-Project.git
+cd RIKO-Major-Project
+bash install.sh
+bash run.sh</code></pre>
+                </div>
+              </article>
+            </div>
+            <div class="setup-notes">
+              <div>
+                <span class="note-icon">↗</span>
+                <p>
+                  <strong>First-time setup needs internet.</strong> Installers
+                  create or reuse <code>.venv-tts</code>, install dependencies,
+                  download Kokoro assets, prepare Ollama with
+                  <code>qwen3:4b-instruct</code>, warm the Faster-Whisper base
+                  cache and launch profile setup if no personal profile exists.
+                  Profile saving requires confirmation.
+                </p>
+              </div>
+              <div>
+                <span class="note-icon">⌁</span>
+                <p>
+                  <strong>Windows:</strong> the installer can use
+                  <code>winget</code> for missing Python, Ollama or curl.
+                  Desktop and Start Menu shortcuts launch the GUI without a
+                  console.
+                </p>
+              </div>
+              <div>
+                <span class="note-icon">!</span>
+                <p>
+                  <strong>Linux:</strong> setup uses <code>sudo</code> (or root)
+                  with <code>apt-get</code> and automatically configures
+                  Debian/Ubuntu only. If a Kokoro download fails, a
+                  <code>.part</code> file may remain in
+                  <code>models/kokoro/</code>; inspect or remove it before
+                  retrying. Reruns are not failure-proof.
+                </p>
+              </div>
+              <div>
+                <span class="note-icon">▤</span>
+                <p>
+                  <strong>Local files stay local.</strong> Model assets and
+                  personal profiles are created on your machine and are not
+                  committed to the repository.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section
+          id="requirements"
+          class="section-wrap section-block requirements-section"
+        >
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">BEFORE YOU INSTALL</div>
+              <h2>Know your <span>setup.</span></h2>
+            </div>
+            <p>
+              Planning estimates, not benchmarks. Actual speed and memory use
+              vary by machine, context and audio setup.
+            </p>
+          </div>
+          <div class="requirements-grid">
+            <article class="requirement-card">
+              <div class="req-tag">MINIMUM</div>
+              <h3>Text chat only</h3>
+              <p class="req-subtitle">Usable baseline</p>
+              <dl>
+                <div>
+                  <dt>Operating system</dt>
+                  <dd>Windows 10 or 11 (64-bit) / Debian or Ubuntu (64-bit)</dd>
+                </div>
+                <div>
+                  <dt>Processor</dt>
+                  <dd>
+                    Recent 64-bit dual-core. AVX2 recommended, not required.
+                  </dd>
+                </div>
+                <div>
+                  <dt>Memory</dt>
+                  <dd>8 GB RAM</dd>
+                </div>
+                <div>
+                  <dt>Free disk space</dt>
+                  <dd>10 GB before installation</dd>
+                </div>
+                <div>
+                  <dt>Graphics</dt>
+                  <dd>No dedicated GPU required</dd>
+                </div>
+                <div>
+                  <dt>Python</dt>
+                  <dd>3.10 or newer</dd>
+                </div>
+                <div>
+                  <dt>Network</dt>
+                  <dd>Internet during initial setup</dd>
+                </div>
+              </dl>
+              <p class="requirement-note">
+                Text generation is usable but slow on a dual-core processor.
+                Closing memory-heavy applications helps.
+              </p>
+            </article>
+            <article class="requirement-card requirement-recommended">
+              <div class="req-tag req-tag-featured">RECOMMENDED</div>
+              <h3>Text + voice chat</h3>
+              <p class="req-subtitle">More comfortable experience</p>
+              <dl>
+                <div>
+                  <dt>Operating system</dt>
+                  <dd>Windows 11 / Ubuntu 22.04 or newer (64-bit)</dd>
+                </div>
+                <div>
+                  <dt>Processor</dt>
+                  <dd>Recent 64-bit quad-core or better</dd>
+                </div>
+                <div>
+                  <dt>Memory</dt>
+                  <dd>16 GB RAM</dd>
+                </div>
+                <div>
+                  <dt>Free disk space</dt>
+                  <dd>20 GB before installation</dd>
+                </div>
+                <div>
+                  <dt>Graphics</dt>
+                  <dd>Dedicated GPU optional</dd>
+                </div>
+                <div>
+                  <dt>Audio</dt>
+                  <dd>
+                    Stable microphone and speakers or headphones. Headphones
+                    recommended to reduce echo.
+                  </dd>
+                </div>
+                <div>
+                  <dt>Python</dt>
+                  <dd>3.11 or newer</dd>
+                </div>
+              </dl>
+              <p class="requirement-note">
+                Speech recognition runs on the CPU in int8 mode. The language
+                model may use supported hardware acceleration when available.
+              </p>
+            </article>
+          </div>
+          <div class="estimate-panels">
+            <article>
+              <h3>Disk space estimates</h3>
+              <dl>
+                <div>
+                  <dt>Ollama runtime</dt>
+                  <dd>~1 GB</dd>
+                </div>
+                <div>
+                  <dt>qwen3:4b-instruct (Q4_K_M)</dt>
+                  <dd>~2.5 GB</dd>
+                </div>
+                <div>
+                  <dt>Kokoro model + voice data</dt>
+                  <dd>~120 MB</dd>
+                </div>
+                <div>
+                  <dt>Faster-Whisper base cache</dt>
+                  <dd>~150–300 MB</dd>
+                </div>
+                <div>
+                  <dt>Python environment + packages</dt>
+                  <dd>~1.5–2 GB</dd>
+                </div>
+                <div class="estimate-total">
+                  <dt>Installation total</dt>
+                  <dd>~5–6 GB</dd>
+                </div>
+                <div>
+                  <dt>Plus caches, updates, temporary downloads</dt>
+                  <dd>10 GB minimum, 20 GB comfortable</dd>
+                </div>
+              </dl>
+            </article>
+            <article>
+              <h3>Approximate memory use</h3>
+              <dl>
+                <div>
+                  <dt>Operating system + desktop</dt>
+                  <dd>2–3 GB</dd>
+                </div>
+                <div>
+                  <dt>Ollama + chat model with context</dt>
+                  <dd>4–5 GB</dd>
+                </div>
+                <div>
+                  <dt>Faster-Whisper base (int8)</dt>
+                  <dd>0.5–1 GB</dd>
+                </div>
+                <div>
+                  <dt>Kokoro ONNX synthesis</dt>
+                  <dd>~0.3 GB</dd>
+                </div>
+                <div class="estimate-total">
+                  <dt>Text-only peak</dt>
+                  <dd>6–7 GB (8 GB tight but workable)</dd>
+                </div>
+                <div class="estimate-total">
+                  <dt>Voice peak, all components loaded</dt>
+                  <dd>7–9 GB (16 GB comfortable)</dd>
+                </div>
+              </dl>
+            </article>
+          </div>
+          <p class="estimate-footnote">
+            These figures are conservative planning estimates based on model
+            sizes and CPU inference behaviour, not cross-machine benchmarks. No
+            minimum processor generation or GPU/VRAM requirement is claimed.
+            RIKO is local-first, not guaranteed fully offline; setup downloads
+            dependencies and model assets.
+          </p>
+        </section>
+        <section class="privacy-section">
+          <div class="section-wrap section-block privacy-layout">
+            <div>
+              <div class="eyebrow">PRIVACY BY DEFAULT</div>
+              <h2>Local-first.<br /><span>With clear limits.</span></h2>
+              <p class="privacy-intro">
+                RIKO keeps its default conversation path on your machine. Here
+                is what that does—and does not—mean.
+              </p>
+            </div>
+            <div class="privacy-list">
+              <article>
+                <span>01</span>
+                <div>
+                  <h3>Conversations stay local</h3>
+                  <p>
+                    Chat sessions, personal profiles and the optional speech
+                    cache live on your machine. Default setup sends prompts and
+                    messages only to the local Ollama HTTP service at
+                    <code>127.0.0.1:11434</code>, and configures no hosted LLM
+                    API.
+                  </p>
+                </div>
+              </article>
+              <article>
+                <span>02</span>
+                <div>
+                  <h3>No persistent chat history store</h3>
+                  <p>
+                    The active conversation is held in process memory for the
+                    running session only.
+                  </p>
+                </div>
+              </article>
+              <article>
+                <span>03</span>
+                <div>
+                  <h3>Git-ignored local configuration</h3>
+                  <p>
+                    Personal preferences, persona choices, behaviour overrides,
+                    speech-cache files and profile data live under
+                    <code>config/local/</code> and are not committed.
+                  </p>
+                </div>
+              </article>
+              <article>
+                <span>04</span>
+                <div>
+                  <h3>Local diagnostic logging</h3>
+                  <p>
+                    Logs are written under <code>logs/</code> and record timing,
+                    event information, error details and some tool-call
+                    metadata. Review local logs before sharing them.
+                  </p>
+                </div>
+              </article>
+              <article>
+                <span>05</span>
+                <div>
+                  <h3>Setup is not offline</h3>
+                  <p>
+                    Dependencies and model assets are downloaded during
+                    installation. Local-first inference does not make the
+                    installation offline.
+                  </p>
+                </div>
+              </article>
+              <article>
+                <span>06</span>
+                <div>
+                  <h3>Bounded tools</h3>
+                  <p>
+                    The codebase explorer is read-only and excludes sensitive
+                    paths, environment files, binary files, model files, logs
+                    and virtual environments. This is a safety boundary for that
+                    tool, not a security audit of the machine.
+                  </p>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+        <section id="status" class="section-wrap section-block status-section">
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">PROJECT STATUS</div>
+              <h2>What works <span>today.</span></h2>
+            </div>
+            <p>
+              Active development. Features, interfaces and setup requirements
+              may change.
+            </p>
+          </div>
+          <div class="status-layout">
+            <div class="status-panel">
+              <div class="status-panel-head">
+                <span>WORKING TODAY</span
+                ><span class="live-pill"><i></i> CURRENT</span>
+              </div>
+              <ul class="status-list">
+                <li>
+                  Desktop GUI (Tkinter) on Windows and Linux, with an OS-native
+                  title bar, and an equivalent terminal mode
+                </li>
+                <li>
+                  Text chat with Markdown replies, streaming,
+                  <b>Regenerate</b> and <b>Read aloud</b>
+                </li>
+                <li>
+                  Hands-free voice mode with Kokoro speech and interruption
+                  controls
+                </li>
+                <li>
+                  Local Faster-Whisper transcription with rolling drafts and a
+                  two-minute limit
+                </li>
+                <li>
+                  CLI menu: Text Chat, Voice Chat, Settings and Selectors, Exit
+                </li>
+                <li>
+                  Stop control that cancels the active Ollama stream and Kokoro
+                  playback
+                </li>
+                <li>
+                  Local profiles, eleven behaviour parameters, and
+                  response-style presets
+                </li>
+                <li>
+                  Zoom from 80% to 160% via controls, shortcuts and mouse wheel
+                </li>
+                <li>
+                  Two bounded local tools: architecture lookup and read-only
+                  source explorer
+                </li>
+              </ul>
+              <div class="roadmap">
+                <div class="roadmap-title">
+                  ROADMAP <span>IN PROGRESS</span>
+                </div>
+                <p>Desktop GUI (GTK4) — in progress</p>
+                <p>Growth mode and voice barge-in tuning — in progress</p>
+              </div>
+            </div>
+            <aside class="status-aside">
+              <div class="status-aside-icon">!</div>
+              <h3>Prototype, not promise.</h3>
+              <p>
+                Voice interruption is a prototype. Acoustic echo cancellation is
+                not implemented, so headphones are recommended. Barge-in and
+                echo behaviour depend on the microphone, speakers, room and
+                audio drivers.
+              </p>
+              <div class="status-aside-rule"></div>
+              <p>
+                Model outputs can be inaccurate. A 4-billion-parameter model
+                running locally can produce plausible but incorrect statements.
+              </p>
+              <a
+                href="https://github.com/amartyasinghnamra/RIKO-Major-Project"
+                target="_blank"
+                rel="noreferrer"
+                >Review source on GitHub ↗</a
+              >
+            </aside>
+          </div>
+        </section>
+        <section class="credits-section">
+          <div class="section-wrap credits-inner">
+            <div>
+              <div class="eyebrow">CREDITS</div>
+              <h2>Made with intention.</h2>
+            </div>
+            <div class="credits-copy">
+              <p>
+                Initiated by Amartya Singh Namra (B.Tech AI &amp; ML), with
+                Priyanshu Tiwari and Saurabh Pandey.
+              </p>
+              <p>
+                Inspired by Project Riko by Rayen (MIT) — RIKO is an
+                independent, fully local implementation.
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
+      <footer class="site-footer">
+        <a class="brand" href="#top"
+          ><span class="brand-mark">R</span
+          ><span>RIKO<span class="brand-dot">.</span></span></a
+        ><span>Local-first companion · Active development</span
+        ><a
+          href="https://github.com/amartyasinghnamra/RIKO-Major-Project"
+          target="_blank"
+          rel="noreferrer"
+          >GitHub ↗</a
+        >
+      </footer>
+    </div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

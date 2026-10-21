@@ -1,0 +1,88 @@
+[
+  {
+    "name": "Navigate from hero to installation",
+    "sanity": true,
+    "viewport": "desktop",
+    "covers": [
+      "hero copy and terminal illustration",
+      "navigation anchors",
+      "installation paths",
+      "real repository URL"
+    ],
+    "description": "Verifies the main page exposes the hero, terminal illustration and working installation destinations.",
+    "steps": [
+      "Open the RIKO website",
+      "Use the Get started button",
+      "Inspect the packaged and source installation options"
+    ],
+    "expected": "The hero is visible, Get started navigates to Install, the release link targets the RIKO GitHub Releases page, and clone commands use the real repository URL and root directory."
+  },
+  {
+    "name": "Mobile navigation and responsive cards",
+    "viewport": "mobile",
+    "covers": [
+      "390px responsive layout",
+      "collapsible navigation",
+      "one-column feature grid",
+      "real text-chat and voice-chat screenshots",
+      "terminal horizontal scrolling"
+    ],
+    "description": "Checks the narrow layout remains readable without page-level horizontal overflow.",
+    "steps": [
+      "Set viewport width to 390px",
+      "Open the Menu control and follow a navigation link",
+      "Inspect feature cards, terminal illustration and screenshot slots"
+    ],
+    "expected": "Navigation collapses into a menu, menu links close the menu, the feature grid is one column, the terminal scrolls horizontally within its frame, and screenshot cards show the actual uploaded text-chat and voice-chat screenshot images with polished frames and no mockup placeholders."
+  },
+  {
+    "name": "Verify status roadmap and exact credits",
+    "viewport": "desktop",
+    "covers": [
+      "current status list",
+      "roadmap wording",
+      "required credit lines"
+    ],
+    "description": "Verifies roadmap items remain marked in progress and the requested credit lines are present verbatim.",
+    "steps": [
+      "Navigate to Project Status",
+      "Read the Roadmap block",
+      "Navigate to Credits"
+    ],
+    "expected": "The roadmap displays 'Desktop GUI (GTK4) — in progress' and 'Growth mode and voice barge-in tuning — in progress'; both required credit lines match the supplied wording."
+  },
+  {
+    "name": "Copy repository-root installation commands",
+    "viewport": "mobile",
+    "covers": [
+      "Windows CMD install commands",
+      "Linux install commands",
+      "copy controls",
+      "setup caveats"
+    ],
+    "description": "Verifies command blocks remain available on mobile and describe first-run setup accurately.",
+    "steps": [
+      "Navigate to Install",
+      "Use a Copy button for a command block",
+      "Inspect setup notes for Windows and Linux"
+    ],
+    "expected": "Windows commands end with install.bat and run.bat; Linux commands end with bash install.sh and bash run.sh; notes explain internet-required model downloads, Debian/Ubuntu scope and the partial Kokoro download retry caveat."
+  },
+  {
+    "name": "Review privacy and requirements disclosures",
+    "viewport": "desktop",
+    "covers": [
+      "privacy disclosures",
+      "unchanged requirements estimates",
+      "local-first versus offline distinction",
+      "prototype limitations"
+    ],
+    "description": "Checks the page does not promise fully offline operation or overstate voice interruption.",
+    "steps": [
+      "Navigate to Requirements",
+      "Review Privacy",
+      "Review Project Status limitations"
+    ],
+    "expected": "Hardware and memory estimates are shown with caveats, privacy copy states setup needs internet, and voice interruption is clearly labelled as a prototype without acoustic echo cancellation."
+  }
+]
